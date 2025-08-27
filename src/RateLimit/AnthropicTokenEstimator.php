@@ -40,7 +40,7 @@ final class AnthropicTokenEstimator extends AbstractTokenEstimator
             }
         }
 
-        return trim($text);
+        return mb_trim($text);
     }
 
     protected function getProviderAdjustments(): array

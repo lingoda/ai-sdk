@@ -70,7 +70,7 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
 
         // Clean text for basic estimation
         $cleanText = preg_replace('/\s+/', ' ', (string) $cleanText);
-        $cleanText = trim((string) $cleanText);
+        $cleanText = mb_trim((string) $cleanText);
 
         if (empty($cleanText)) {
             return max(1, $specialTokens);

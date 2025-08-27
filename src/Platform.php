@@ -117,7 +117,7 @@ final readonly class Platform implements PlatformInterface
      */
     public function textToSpeech(string $input, AudioOptionsInterface $options): BinaryResult
     {
-        $input = trim($input);
+        $input = mb_trim($input);
         if ($input === '') {
             throw new InvalidArgumentException('Text input cannot be empty for text-to-speech conversion.');
         }
@@ -140,7 +140,7 @@ final readonly class Platform implements PlatformInterface
      */
     public function textToSpeechStream(string $input, AudioOptionsInterface $options): StreamResult
     {
-        $input = trim($input);
+        $input = mb_trim($input);
         if ($input === '') {
             throw new InvalidArgumentException('Text input cannot be empty for text-to-speech conversion.');
         }

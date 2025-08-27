@@ -201,7 +201,7 @@ abstract readonly class Prompt implements \Stringable
             return null;
         }
 
-        $variableName = trim(mb_substr(
+        $variableName = mb_trim(mb_substr(
             $content,
             $varStart + mb_strlen(self::PARAMETER_OPENING),
             $varEnd - $varStart - mb_strlen(self::PARAMETER_OPENING)

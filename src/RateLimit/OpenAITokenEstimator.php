@@ -31,6 +31,6 @@ final class OpenAITokenEstimator extends AbstractTokenEstimator
             }
         }
 
-        return trim($text);
+        return mb_trim($text);
     }
 }

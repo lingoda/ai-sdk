@@ -30,6 +30,6 @@ final class TokenEstimator extends AbstractTokenEstimator
             }
         }
 
-        return trim($text);
+        return mb_trim($text);
     }
 }
