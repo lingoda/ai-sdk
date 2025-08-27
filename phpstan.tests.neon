@@ -1,0 +1,52 @@
+parameters:
+    tmpDir: .phpstan-cache
+    level: 6
+    resultCachePath: '%tmpDir%/resultCache-tests.php'
+    paths:
+        - tests
+    
+    # Test-specific relaxed rules
+    checkMissingCallableSignature: false
+    checkExplicitMixedMissingReturn: false
+    treatPhpDocTypesAsCertain: false
+    polluteScopeWithLoopInitialAssignments: false
+    polluteScopeWithAlwaysIterableForeach: false
+    
+    # Exception handling - relaxed for tests
+    exceptions:
+        check:
+            missingCheckedExceptionInThrows: false
+            tooWideThrowType: false
+        implicitThrows: false
+    
+    # Ignore common test patterns that are acceptable
+    ignoreErrors:
+        # PHPUnit createMock() unresolvable return types
+        - '#Return type of call to method PHPUnit\\Framework\\TestCase::createMock\(\) contains unresolvable type#'
+        
+        # Allow missing type specifications in test methods
+        - '#Method .* has parameter .* with no type specified#'
+        - '#Method .* has parameter .* with no value type specified in iterable type array#'
+        
+        # Allow array type specification issues in tests
+        - '#Parameter .* expects array<string, string>, array<int\|string, string> given#'
+        - '#Parameter .* expects array<string>, array<int, int\|string> given#'
+        
+        # Allow trivial assertions in tests
+        - '#Call to method PHPUnit\\Framework\\Assert::.* will always evaluate to true#'
+        
+        # Allow undefined methods in mock objects and interfaces
+        - '#Call to an undefined method .*Interface::(expects|textToSpeech|speechToText|translate|getMetadata)\(\)#'
+        
+        # Allow write-only properties in test classes
+        - '#Property .* is never read, only written#'
+        
+        # Allow missing types in test-specific classes and anonymous classes
+        - '#Method class@anonymous.*::.* has no return type specified#'
+        - '#Property .* type has no value type specified in iterable type array#'
+        
+        # Allow test data patterns
+        - '#Array has .* duplicate keys#'
+        
+        # Allow test helper functions that may not be autoloaded
+        - '#(Used function|Function) .*(userPrompt|systemPrompt|assistantPrompt) not found#'
