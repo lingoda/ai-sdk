@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\Anthropic;
 
@@ -68,7 +68,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getCapabilities(): array
     {
-        return match($this) {
+        return match ($this) {
             // All Claude models support text, tools, vision, and multimodal
             self::CLAUDE_OPUS_41,
             self::CLAUDE_OPUS_4,
@@ -89,7 +89,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function hasCapability(Capability $capability): bool
     {
-        return in_array($capability, $this->getCapabilities());
+        return in_array($capability, $this->getCapabilities(), true);
     }
 
     /**
@@ -99,7 +99,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getOptions(): array
     {
-        return match($this) {
+        return match ($this) {
             // API verified: 32,000 max tokens
             self::CLAUDE_OPUS_41,
             self::CLAUDE_OPUS_4 => [
@@ -107,7 +107,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 32000,
                 'top_p' => 1.0,
             ],
-            // API verified: Claude Sonnet 4 = 64,000+, Claude 3.7 Sonnet = 64,000+ 
+            // API verified: Claude Sonnet 4 = 64,000+, Claude 3.7 Sonnet = 64,000+
             self::CLAUDE_SONNET_4,
             self::CLAUDE_SONNET_37 => [
                 'temperature' => 0.7,
@@ -133,7 +133,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getDisplayName(): string
     {
-        return match($this) {
+        return match ($this) {
             self::CLAUDE_OPUS_41 => 'Claude Opus 4.1',
             self::CLAUDE_OPUS_4 => 'Claude Opus 4',
             self::CLAUDE_SONNET_4 => 'Claude Sonnet 4',

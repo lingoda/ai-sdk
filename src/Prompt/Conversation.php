@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Prompt;
 
@@ -9,7 +9,7 @@ use Lingoda\AiSdk\Security\DataSanitizer;
 
 /**
  * Value object representing an AI conversation with system, assistant, and user prompts
- * 
+ *
  * This is the central object for all conversation-related operations:
  * - Sanitization of sensitive data
  * - Token estimation
@@ -213,8 +213,8 @@ final readonly class Conversation
     public function withSystemPrompt(SystemPrompt $systemPrompt): self
     {
         return new self(
-            $this->userPrompt, 
-            $systemPrompt, 
+            $this->userPrompt,
+            $systemPrompt,
             $this->assistantPrompt,
             $this->isSanitized
         );
@@ -226,8 +226,8 @@ final readonly class Conversation
     public function withAssistantPrompt(AssistantPrompt $assistantPrompt): self
     {
         return new self(
-            $this->userPrompt, 
-            $this->systemPrompt, 
+            $this->userPrompt,
+            $this->systemPrompt,
             $assistantPrompt,
             $this->isSanitized
         );
@@ -235,7 +235,7 @@ final readonly class Conversation
     
     /**
      * Convert to messages array format (common for chat APIs)
-     * 
+     *
      * @return array<int, array{role: string, content: string}>
      */
     public function toArray(): array
@@ -285,7 +285,7 @@ final readonly class Conversation
     
     /**
      * Estimate the number of tokens in this conversation
-     * 
+     *
      * @param callable(string): int $estimator A function that estimates tokens for a string
      */
     public function estimateTokens(callable $estimator): int
@@ -299,9 +299,9 @@ final readonly class Conversation
     public function equals(self $other): bool
     {
         return $this->userPrompt->equals($other->userPrompt)
-            && (($this->systemPrompt === null && $other->systemPrompt === null) 
+            && (($this->systemPrompt === null && $other->systemPrompt === null)
                 || ($this->systemPrompt !== null && $other->systemPrompt !== null && $this->systemPrompt->equals($other->systemPrompt)))
-            && (($this->assistantPrompt === null && $other->assistantPrompt === null) 
+            && (($this->assistantPrompt === null && $other->assistantPrompt === null)
                 || ($this->assistantPrompt !== null && $other->assistantPrompt !== null && $this->assistantPrompt->equals($other->assistantPrompt)));
     }
     

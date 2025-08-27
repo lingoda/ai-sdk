@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Client\OpenAI;
 
@@ -8,12 +8,12 @@ use Lingoda\AiSdk\Audio\AudioCapableInterface;
 use Lingoda\AiSdk\Audio\AudioOptionsInterface;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\OpenAI\OpenAIResultConverter;
-use Lingoda\AiSdk\Provider\OpenAIProvider;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Enum\OpenAI\AudioSpeechFormat;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Provider\OpenAIProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\BinaryResult;
 use Lingoda\AiSdk\Result\ResultInterface;
@@ -73,15 +73,15 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             $response = $this->client->audio()->speech($payload);
             
             $responseFormat = $payload['response_format'] ?? AudioSpeechFormat::MP3->value;
-            $format = is_string($responseFormat) ? 
-                (AudioSpeechFormat::tryFrom($responseFormat) ?? AudioSpeechFormat::MP3) : 
+            $format = is_string($responseFormat) ?
+                (AudioSpeechFormat::tryFrom($responseFormat) ?? AudioSpeechFormat::MP3) :
                 AudioSpeechFormat::MP3;
             
             return new BinaryResult($response, $format->getMimeType());
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI text-to-speech request failed', [
                 'exception' => $e,
-                'input_length' => strlen($input),
+                'input_length' => mb_strlen($input),
             ]);
 
             throw new ClientException(
@@ -98,8 +98,8 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             $streamResponse = $this->client->audio()->speechStreamed($payload);
 
             $responseFormat = $payload['response_format'] ?? AudioSpeechFormat::MP3->value;
-            $format = is_string($responseFormat) ? 
-                (AudioSpeechFormat::tryFrom($responseFormat) ?? AudioSpeechFormat::MP3) : 
+            $format = is_string($responseFormat) ?
+                (AudioSpeechFormat::tryFrom($responseFormat) ?? AudioSpeechFormat::MP3) :
                 AudioSpeechFormat::MP3;
 
             // Convert OpenAI's SpeechStreamResponse to our StreamResult
@@ -114,7 +114,7 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI text-to-speech streaming request failed', [
                 'exception' => $e,
-                'input_length' => strlen($input),
+                'input_length' => mb_strlen($input),
             ]);
 
             throw new ClientException(
@@ -210,7 +210,7 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             // Throw exception if no valid messages found (must have at least user or assistant message)
             $hasValidMessage = false;
             foreach ($messages as $message) {
-                if (is_array($message) && isset($message['role']) && in_array($message['role'], ['user', 'assistant'])) {
+                if (is_array($message) && isset($message['role']) && in_array($message['role'], ['user', 'assistant'], true)) {
                     $hasValidMessage = true;
                     break;
                 }
@@ -234,5 +234,4 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
 
         return $requestPayload;
     }
-
 }

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Converter\OpenAI;
 
@@ -21,7 +21,7 @@ final class OpenAIResultConverter implements ResultConverterInterface
 {
     public function supports(ModelInterface $model, mixed $response): bool
     {
-        return $model->getProvider()->is(AIProvider::OPENAI) 
+        return $model->getProvider()->is(AIProvider::OPENAI)
             && $response instanceof CreateResponse;
     }
 

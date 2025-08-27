@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Prompt;
 
@@ -12,7 +12,7 @@ final readonly class UserPrompt extends Prompt
 {
     /**
      * Factory method for creating a user prompt
-     * 
+     *
      * @param array<string, mixed> $parameters
      */
     public static function create(string $content, array $parameters = []): self

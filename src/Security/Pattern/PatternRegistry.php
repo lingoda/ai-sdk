@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security\Pattern;
 
@@ -14,11 +14,12 @@ final readonly class PatternRegistry
         private DefaultPatterns $defaultPatterns,
         private array $configPatterns = [],
         private array $customPatterns = []
-    ) {}
+    ) {
+    }
 
     /**
      * Get all patterns merged from defaults, config, and custom patterns
-     * 
+     *
      * @return array<string, string> pattern => replacement mapping
      */
     public function getAllPatterns(): array
@@ -62,7 +63,7 @@ final readonly class PatternRegistry
 
     /**
      * Get all pattern names/keys
-     * 
+     *
      * @return array<string>
      */
     public function getPatternNames(): array
@@ -72,7 +73,7 @@ final readonly class PatternRegistry
 
     /**
      * Create a registry with additional patterns
-     * 
+     *
      * @param array<string, string> $additionalPatterns
      */
     public function withAdditionalPatterns(array $additionalPatterns): self
@@ -86,7 +87,7 @@ final readonly class PatternRegistry
 
     /**
      * Create a registry with custom patterns added
-     * 
+     *
      * @param array<string> $customPatterns
      */
     public function withCustomPatterns(array $customPatterns): self

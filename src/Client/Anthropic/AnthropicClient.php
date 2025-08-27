@@ -1,17 +1,17 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Client\Anthropic;
 
 use Anthropic\Client as AnthropicAPIClient;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Anthropic\AnthropicResultConverter;
-use Lingoda\AiSdk\Provider\AnthropicProvider;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Provider\AnthropicProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\ResultInterface;
 use Psr\Log\LoggerInterface;
@@ -140,5 +140,4 @@ final class AnthropicClient implements ClientInterface
 
         return $requestPayload;
     }
-
 }

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Converter\Gemini;
 
@@ -22,7 +22,7 @@ final class GeminiResultConverter implements ResultConverterInterface
 {
     public function supports(ModelInterface $model, mixed $response): bool
     {
-        return $model->getProvider()->is(AIProvider::GEMINI) 
+        return $model->getProvider()->is(AIProvider::GEMINI)
             && $response instanceof GenerateContentResponse;
     }
 
@@ -85,5 +85,4 @@ final class GeminiResultConverter implements ResultConverterInterface
         
         return new TextResult($content, $metadata);
     }
-
 }

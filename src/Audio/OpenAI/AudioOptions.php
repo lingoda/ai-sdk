@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Audio\OpenAI;
 
@@ -22,7 +22,8 @@ final readonly class AudioOptions implements AudioOptionsInterface
      */
     private function __construct(
         private array $options
-    ) {}
+    ) {
+    }
 
     public static function textToSpeech(
         AudioSpeechModel $model = AudioSpeechModel::TTS_1,

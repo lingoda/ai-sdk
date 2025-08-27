@@ -1,9 +1,8 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Exception;
-
 
 final class RateLimitExceededException extends RuntimeException
 {

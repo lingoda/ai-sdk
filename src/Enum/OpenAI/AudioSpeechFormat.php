@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\OpenAI;
 
@@ -18,7 +18,7 @@ enum AudioSpeechFormat: string
      */
     public function getMimeType(): string
     {
-        return match($this) {
+        return match ($this) {
             self::MP3 => 'audio/mpeg',
             self::OPUS => 'audio/opus',
             self::AAC => 'audio/aac',

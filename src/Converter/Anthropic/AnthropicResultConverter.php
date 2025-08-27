@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Converter\Anthropic;
 
@@ -21,7 +21,7 @@ final class AnthropicResultConverter implements ResultConverterInterface
 {
     public function supports(ModelInterface $model, mixed $response): bool
     {
-        return $model->getProvider()->is(AIProvider::ANTHROPIC) 
+        return $model->getProvider()->is(AIProvider::ANTHROPIC)
             && $response instanceof CreateResponse;
     }
 

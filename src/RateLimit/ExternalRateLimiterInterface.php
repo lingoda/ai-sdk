@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\RateLimit;
 
@@ -16,7 +16,7 @@ interface ExternalRateLimiterInterface
 {
     /**
      * Create or retrieve a rate limiter for the given provider and type.
-     * 
+     *
      * @param string $providerId The AI provider ID (e.g., 'openai', 'anthropic')
      * @param string $type The limiter type ('requests' or 'tokens')
      * @param ModelInterface $model The model being used (for context)

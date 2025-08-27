@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security\Pattern;
 
@@ -11,7 +11,8 @@ final readonly class DefaultPatterns
      */
     public function __construct(
         private array $patterns = []
-    ) {}
+    ) {
+    }
 
     /**
      * @return array<string, string> Pattern => Replacement mapping
@@ -24,7 +25,7 @@ final readonly class DefaultPatterns
     /**
      * Comprehensive default patterns for sensitive data detection
      * Based on GDPR, CCPA, and common security best practices
-     * 
+     *
      * @return array<string, string>
      */
     private function getFallbackPatterns(): array

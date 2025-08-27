@@ -1,21 +1,21 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Client\Gemini;
 
 use Gemini\Client as GeminiAPIClient;
-use Gemini\Data\GenerationConfig;
 use Gemini\Data\Content;
+use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
 use Gemini\Enums\Role;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter;
-use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\ResultInterface;
 use Psr\Log\LoggerInterface;
@@ -59,7 +59,7 @@ final class GeminiClient implements ClientInterface
 
             Assert::isArray($requestData['contents']);
             // Ensure all contents are Content objects for safe unpacking
-            $contentObjects = array_filter($requestData['contents'], fn($content) => $content instanceof Content);
+            $contentObjects = array_filter($requestData['contents'], fn ($content) => $content instanceof Content);
             $response = $generativeModel->generateContent(...$contentObjects);
             
             return $this->getResultConverter()->convert($model, $response);
@@ -241,5 +241,4 @@ final class GeminiClient implements ClientInterface
 
         return $requestData;
     }
-
 }

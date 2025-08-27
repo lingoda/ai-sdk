@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\RateLimit;
 
@@ -8,7 +8,7 @@ final class TokenEstimator extends AbstractTokenEstimator
 {
     /**
      * Generic fallback text extraction when no provider-specific estimator is available
-     * 
+     *
      * @param array<string, mixed> $payload
      */
     protected function extractTextFromPayload(array $payload): string

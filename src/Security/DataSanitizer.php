@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security;
 
@@ -17,7 +17,8 @@ final readonly class DataSanitizer
         private bool $auditLog = false,
         private LoggerInterface $logger = new NullLogger(),
         private ?AttributeSanitizer $attributeSanitizer = null
-    ) {}
+    ) {
+    }
 
     public function isEnabled(): bool
     {
@@ -63,7 +64,7 @@ final readonly class DataSanitizer
 
     /**
      * Sanitize data recursively
-     * 
+     *
      * @param mixed $data
      * @return mixed
      */
@@ -92,7 +93,7 @@ final readonly class DataSanitizer
 
     /**
      * Sanitize object data using attribute-based sanitization first, then pattern-based
-     * 
+     *
      * @param object $data
      * @return object
      */
@@ -121,9 +122,9 @@ final readonly class DataSanitizer
             
             $this->logger->warning('Sensitive data detected and sanitized', [
                 'detected_patterns' => $detectedPatterns,
-                'original_length' => strlen($originalData),
-                'sanitized_length' => strlen($sanitizedData),
-                'redacted_sample' => substr($sanitizedData, 0, 100) . (strlen($sanitizedData) > 100 ? '...' : '')
+                'original_length' => mb_strlen($originalData),
+                'sanitized_length' => mb_strlen($sanitizedData),
+                'redacted_sample' => mb_substr($sanitizedData, 0, 100) . (mb_strlen($sanitizedData) > 100 ? '...' : '')
             ]);
         }
         
@@ -132,7 +133,7 @@ final readonly class DataSanitizer
 
     /**
      * Get the names of patterns that matched in the given content
-     * 
+     *
      * @return list<string>
      */
     private function getDetectedPatterns(string $content): array

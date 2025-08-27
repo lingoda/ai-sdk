@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Converter;
 
@@ -22,9 +22,9 @@ interface ResultConverterInterface
     /**
      * Convert the provider's response object to a typed result.
      *
-     * @throws InvalidArgumentException|RuntimeException
      *
      * @param T $response
+     * @throws InvalidArgumentException|RuntimeException
      */
     public function convert(ModelInterface $model, object $response): ResultInterface;
 }

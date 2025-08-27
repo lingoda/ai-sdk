@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Result;
 
@@ -48,7 +48,7 @@ final class StreamResult extends BaseResult implements \IteratorAggregate
     /**
      * Create an iterator that yields chunks from the stream.
      * This allows for foreach iteration over the stream chunks.
-     * 
+     *
      * @return \Generator<string>
      */
     public function getIterator(): \Generator
@@ -76,7 +76,7 @@ final class StreamResult extends BaseResult implements \IteratorAggregate
 
     /**
      * Read data from the stream.
-     * 
+     *
      * @param int $length Number of bytes to read
      * @return string The data read from the stream
      */

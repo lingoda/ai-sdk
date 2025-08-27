@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\OpenAI;
 
@@ -14,7 +14,7 @@ enum AudioSpeechModel: string
      */
     public function getMaxCharacters(): int
     {
-        return match($this) {
+        return match ($this) {
             self::TTS_1, self::TTS_1_HD => 4096,
         };
     }
@@ -52,5 +52,4 @@ enum AudioSpeechModel: string
             AudioSpeechVoice::SHIMMER,
         ];
     }
-
 }

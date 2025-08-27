@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security\Attribute;
 
@@ -12,7 +12,8 @@ final readonly class Redact
     public function __construct(
         private string $pattern,
         private string $replacement = '[REDACTED]'
-    ) {}
+    ) {
+    }
 
     public function getPattern(): string
     {

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security\Attribute;
 
@@ -12,7 +12,8 @@ final readonly class Sensitive
     public function __construct(
         private ?string $type = null,
         private string $redactionText = '[REDACTED]'
-    ) {}
+    ) {
+    }
 
     public function getType(): ?string
     {

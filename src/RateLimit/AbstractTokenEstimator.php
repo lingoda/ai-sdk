@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\RateLimit;
 
@@ -11,7 +11,7 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
     private const array SPECIAL_TOKEN_PATTERNS = [
         // JSON structure tokens
         '/[{}"\[\]:,]/' => 1,
-        // Code blocks  
+        // Code blocks
         '/```[\s\S]*?```/' => 50,
         // URLs
         '/https?:\/\/[^\s]+/' => 5,
@@ -31,14 +31,14 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
     /**
      * Extract text from provider-specific payload format.
      * Each provider implements their own extraction logic.
-     * 
+     *
      * @param array<string, mixed>|array<int, array{role: string, content: string}> $payload
      */
     abstract protected function extractTextFromPayload(array $payload): string;
 
     /**
      * Get provider-specific token calculation adjustments.
-     * 
+     *
      * @return array{char_divisor: float, word_multiplier: float, sentence_tokens: int, efficiency_factor: float}
      */
     protected function getProviderAdjustments(): array
@@ -46,7 +46,7 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
         // Default adjustments (similar to OpenAI)
         return [
             'char_divisor' => 4.0,        // 1 token ≈ 4 characters
-            'word_multiplier' => 0.75,    // 1 token ≈ 0.75 words  
+            'word_multiplier' => 0.75,    // 1 token ≈ 0.75 words
             'sentence_tokens' => 20,      // ~20 tokens per sentence
             'efficiency_factor' => 1.1,   // 10% safety buffer
         ];

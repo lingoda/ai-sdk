@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Client\Anthropic;
 
@@ -44,7 +44,8 @@ final readonly class AnthropicClientFactory
             ->withApiKey($this->apiKey)
             ->withHttpClient($httpClient)
             ->withHttpHeader('anthropic-version', '2023-06-01')
-            ->make();
+            ->make()
+        ;
 
         return new AnthropicClient($client, $logger);
     }

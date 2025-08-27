@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Prompt;
 
@@ -70,7 +70,7 @@ abstract readonly class Prompt implements \Stringable
     
     /**
      * Convert to array format for API calls
-     * 
+     *
      * @return array{role: string, content: string}
      */
     public function toArray(): array
@@ -136,23 +136,23 @@ abstract readonly class Prompt implements \Stringable
         $resultList = [];
         $currIdx = 0;
 
-        while ($currIdx < strlen($content)) {
+        while ($currIdx < mb_strlen($content)) {
             $result = $this->parseNextVariable($content, $currIdx);
 
             if ($result === null) {
-                $resultList[] = substr($content, $currIdx);
+                $resultList[] = mb_substr($content, $currIdx);
                 break;
             }
 
             [$variableName, $varStart, $varEnd] = $result;
-            $resultList[] = substr($content, $currIdx, $varStart - $currIdx);
+            $resultList[] = mb_substr($content, $currIdx, $varStart - $currIdx);
 
             if (array_key_exists($variableName, $data)) {
                 $value = $data[$variableName];
                 $resultList[] = $this->convertToString($value);
             } else {
                 // Keep original variable placeholder if no replacement found
-                $resultList[] = substr($content, $varStart, $varEnd - $varStart);
+                $resultList[] = mb_substr($content, $varStart, $varEnd - $varStart);
             }
 
             $currIdx = $varEnd;
@@ -171,7 +171,7 @@ abstract readonly class Prompt implements \Stringable
         $names = [];
         $currIdx = 0;
 
-        while ($currIdx < strlen($content)) {
+        while ($currIdx < mb_strlen($content)) {
             $result = $this->parseNextVariable($content, $currIdx);
             if ($result === null) {
                 break;
@@ -191,23 +191,23 @@ abstract readonly class Prompt implements \Stringable
      */
     private function parseNextVariable(string $content, int $startIdx): ?array
     {
-        $varStart = strpos($content, self::PARAMETER_OPENING, $startIdx);
+        $varStart = mb_strpos($content, self::PARAMETER_OPENING, $startIdx);
         if ($varStart === false) {
             return null;
         }
 
-        $varEnd = strpos($content, self::PARAMETER_CLOSING, $varStart);
+        $varEnd = mb_strpos($content, self::PARAMETER_CLOSING, $varStart);
         if ($varEnd === false) {
             return null;
         }
 
-        $variableName = trim(substr(
+        $variableName = trim(mb_substr(
             $content,
-            $varStart + strlen(self::PARAMETER_OPENING),
-            $varEnd - $varStart - strlen(self::PARAMETER_OPENING)
+            $varStart + mb_strlen(self::PARAMETER_OPENING),
+            $varEnd - $varStart - mb_strlen(self::PARAMETER_OPENING)
         ));
 
-        return [$variableName, $varStart, $varEnd + strlen(self::PARAMETER_CLOSING)];
+        return [$variableName, $varStart, $varEnd + mb_strlen(self::PARAMETER_CLOSING)];
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security;
 
@@ -13,7 +13,8 @@ final readonly class SensitiveContentFilter
     public function __construct(
         private PatternRegistry $patternRegistry,
         private LoggerInterface $logger = new NullLogger()
-    ) {}
+    ) {
+    }
 
     /**
      * Get the pattern registry for audit purposes
@@ -52,9 +53,9 @@ final readonly class SensitiveContentFilter
         if ($detectedCount > 0 && $content !== $originalContent) {
             $this->logger->debug('Sensitive content filtered', [
                 'patterns_matched' => $detectedCount,
-                'original_length' => strlen($originalContent),
-                'filtered_length' => strlen($content),
-                'content_sample' => substr($content, 0, 100) . (strlen($content) > 100 ? '...' : '')
+                'original_length' => mb_strlen($originalContent),
+                'filtered_length' => mb_strlen($content),
+                'content_sample' => mb_substr($content, 0, 100) . (mb_strlen($content) > 100 ? '...' : '')
             ]);
         }
 
@@ -71,7 +72,7 @@ final readonly class SensitiveContentFilter
             return $content;
         }
 
-        $replacement = $replacement ?? '[REDACTED]';
+        $replacement ??= '[REDACTED]';
         
         $matches = [];
         if (preg_match_all($pattern, $content, $matches)) {
@@ -85,5 +86,4 @@ final readonly class SensitiveContentFilter
 
         return (string) $content;
     }
-
 }

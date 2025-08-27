@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Security;
 
@@ -8,7 +8,6 @@ use Lingoda\AiSdk\Security\Attribute\Redact;
 use Lingoda\AiSdk\Security\Attribute\Sensitive;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use ReflectionClass;
 use ReflectionObject;
 use ReflectionProperty;
 
@@ -19,7 +18,8 @@ final readonly class AttributeSanitizer
         private bool $enabled = true,
         private bool $auditLog = false,
         private LoggerInterface $logger = new NullLogger()
-    ) {}
+    ) {
+    }
 
     public function isEnabled(): bool
     {
@@ -44,7 +44,7 @@ final readonly class AttributeSanitizer
     /**
      * Sanitize object using attribute-based configuration
      * Only processes objects, returns other data unchanged
-     * 
+     *
      * @param mixed $data
      * @return mixed
      */
@@ -171,7 +171,7 @@ final readonly class AttributeSanitizer
 
     /**
      * Apply redact pattern to array elements
-     * 
+     *
      * @param array<mixed> $array
      * @return array<mixed>
      */
@@ -196,7 +196,7 @@ final readonly class AttributeSanitizer
 
     /**
      * Apply sensitive filtering to array elements
-     * 
+     *
      * @param array<mixed> $array
      * @return array<mixed>
      */
@@ -254,8 +254,8 @@ final readonly class AttributeSanitizer
             'attributes' => $attributes,
             'original_type' => get_debug_type($originalValue),
             'sanitized_type' => get_debug_type($sanitizedValue),
-            'original_length' => is_string($originalValue) ? strlen($originalValue) : null,
-            'sanitized_length' => is_string($sanitizedValue) ? strlen($sanitizedValue) : null,
+            'original_length' => is_string($originalValue) ? mb_strlen($originalValue) : null,
+            'sanitized_length' => is_string($sanitizedValue) ? mb_strlen($sanitizedValue) : null,
         ]);
     }
 }

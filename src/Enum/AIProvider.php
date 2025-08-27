@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum;
 
@@ -12,7 +12,7 @@ enum AIProvider: string
 
     public function getName(): string
     {
-        return match($this) {
+        return match ($this) {
             self::OPENAI => 'OpenAI',
             self::ANTHROPIC => 'Anthropic',
             self::GEMINI => 'Google Gemini',
@@ -26,7 +26,7 @@ enum AIProvider: string
      */
     public function getDefaultRateLimits(): array
     {
-        return match($this) {
+        return match ($this) {
             self::OPENAI => [
                 'requests_per_minute' => 180, // Conservative 90% of 200 RPM
                 'tokens_per_minute' => 450000, // Conservative 90% of 500K TPM

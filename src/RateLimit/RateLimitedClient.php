@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\RateLimit;
 
@@ -133,7 +133,7 @@ final readonly class RateLimitedClient implements ClientInterface
         ];
 
         foreach ($retryablePatterns as $pattern) {
-            if (stripos($message, $pattern) !== false) {
+            if (mb_stripos($message, $pattern) !== false) {
                 return true;
             }
         }
@@ -146,5 +146,4 @@ final readonly class RateLimitedClient implements ClientInterface
     {
         return min(30, self::BASE_RETRY_DELAY * (2 ** $attempt)); // Cap at 30 seconds
     }
-    
 }

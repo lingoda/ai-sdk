@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\OpenAI;
 
@@ -17,7 +17,7 @@ enum AudioTranscribeModel: string
      */
     public function getMaxFileSize(): int
     {
-        return match($this) {
+        return match ($this) {
             self::WHISPER_1,
             self::GPT_4O_MINI_TRANSCRIBE,
             self::GPT_4O_TRANSCRIBE => 25 * 1024 * 1024, // 25 MB
@@ -65,7 +65,7 @@ enum AudioTranscribeModel: string
      */
     public function getMaxDuration(): int
     {
-        return match($this) {
+        return match ($this) {
             self::WHISPER_1,
             self::GPT_4O_MINI_TRANSCRIBE,
             self::GPT_4O_TRANSCRIBE => 3600, // 1 hour
@@ -79,7 +79,7 @@ enum AudioTranscribeModel: string
      */
     public function getCapabilities(): array
     {
-        return match($this) {
+        return match ($this) {
             self::WHISPER_1 => [
                 Capability::AUDIO_TRANSCRIPTION,
                 Capability::AUDIO_TRANSLATION,
@@ -101,12 +101,12 @@ enum AudioTranscribeModel: string
 
     /**
      * Get supported response formats for the model.
-     * 
+     *
      * @return array<string>
      */
     public function getSupportedResponseFormats(): array
     {
-        return match($this) {
+        return match ($this) {
             self::WHISPER_1 => ['json', 'text', 'srt', 'verbose_json', 'vtt'],
             self::GPT_4O_MINI_TRANSCRIBE,
             self::GPT_4O_TRANSCRIBE => ['json', 'text'], // Limited parameter surface

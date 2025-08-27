@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Client\Gemini;
 
@@ -42,7 +42,8 @@ final readonly class GeminiClientFactory
         $client = Gemini::factory()
             ->withApiKey($this->apiKey)
             ->withHttpClient($httpClient)
-            ->make();
+            ->make()
+        ;
 
         return new GeminiClient($client, $logger);
     }

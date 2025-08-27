@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\OpenAI;
 
@@ -42,12 +42,12 @@ enum ChatModel: string implements ModelConfigurationInterface
 
     public function getMaxTokens(): int
     {
-        return match($this) {
+        return match ($this) {
             // GPT-5 series - Assumed very high context (likely 1M+ based on progression)
             self::GPT_5,
             self::GPT_5_20250807 => 2000000, // 2M estimated
             
-            // GPT-5 mini/nano series  
+            // GPT-5 mini/nano series
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807,
             self::GPT_5_NANO,
@@ -74,7 +74,7 @@ enum ChatModel: string implements ModelConfigurationInterface
 
     public function getCapabilities(): array
     {
-        return match($this) {
+        return match ($this) {
             // GPT-5 models - Full multimodal capabilities
             self::GPT_5,
             self::GPT_5_20250807 => [
@@ -85,7 +85,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 Capability::REASONING,
             ],
             
-            // GPT-5 mini/nano - Efficient models with full capabilities  
+            // GPT-5 mini/nano - Efficient models with full capabilities
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807,
             self::GPT_5_NANO,
@@ -136,7 +136,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getOptions(): array
     {
-        return match($this) {
+        return match ($this) {
             // GPT-5 flagship models - Highest output capabilities
             self::GPT_5,
             self::GPT_5_20250807 => [
@@ -210,7 +210,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getDisplayName(): string
     {
-        return match($this) {
+        return match ($this) {
             self::GPT_5 => 'GPT-5',
             self::GPT_5_20250807 => 'GPT-5 (2025-08-07)',
             self::GPT_5_MINI => 'GPT-5 Mini',

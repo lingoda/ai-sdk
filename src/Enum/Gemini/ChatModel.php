@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Enum\Gemini;
 
@@ -19,7 +19,7 @@ enum ChatModel: string implements ModelConfigurationInterface
 
     public function getMaxTokens(): int
     {
-        return match($this) {
+        return match ($this) {
             self::GEMINI_2_5_PRO,
             self::GEMINI_2_5_FLASH => 1000000,
         };
@@ -32,7 +32,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getCapabilities(): array
     {
-        return match($this) {
+        return match ($this) {
             // All Gemini 2.5 models support text, tools, vision, and multimodal
             self::GEMINI_2_5_PRO,
             self::GEMINI_2_5_FLASH => [
@@ -49,7 +49,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function hasCapability(Capability $capability): bool
     {
-        return in_array($capability, $this->getCapabilities());
+        return in_array($capability, $this->getCapabilities(), true);
     }
 
     /**
@@ -59,7 +59,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getOptions(): array
     {
-        return match($this) {
+        return match ($this) {
             self::GEMINI_2_5_PRO,
             self::GEMINI_2_5_FLASH => [
                 'temperature' => 0.7,
@@ -75,7 +75,7 @@ enum ChatModel: string implements ModelConfigurationInterface
      */
     public function getDisplayName(): string
     {
-        return match($this) {
+        return match ($this) {
             self::GEMINI_2_5_PRO => 'Gemini 2.5 Pro',
             self::GEMINI_2_5_FLASH => 'Gemini 2.5 Flash',
         };
