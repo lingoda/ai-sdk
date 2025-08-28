@@ -13,6 +13,7 @@ use Lingoda\AiSdk\Exception\RuntimeException;
 use Lingoda\AiSdk\Prompt\Conversation;
 use Lingoda\AiSdk\Prompt\Prompt;
 use Lingoda\AiSdk\Prompt\UserPrompt;
+use Lingoda\AiSdk\Provider\ProviderCollection;
 use Lingoda\AiSdk\Result\BinaryResult;
 use Lingoda\AiSdk\Result\ResultInterface;
 use Lingoda\AiSdk\Result\StreamResult;
@@ -27,7 +28,7 @@ final readonly class Platform implements PlatformInterface
 {
     private ?DataSanitizer $sanitizer;
     private LoggerInterface $logger;
-    
+
     /**
      * @param iterable<ClientInterface> $clients
      * @param bool $enableSanitization Enable automatic sanitization of sensitive data
@@ -43,7 +44,7 @@ final readonly class Platform implements PlatformInterface
         private ?string $defaultProvider = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
-        
+
         if ($this->enableSanitization) {
             $this->sanitizer = $sanitizer ?? DataSanitizer::createDefault($this->logger);
         } else {
@@ -51,14 +52,9 @@ final readonly class Platform implements PlatformInterface
         }
     }
 
-    public function ask(
-        string|Prompt|Conversation $input,
-        ?string $model = null,
-        array $options = []
-    ): ResultInterface {
+    public function ask(string|Prompt|Conversation $input, ?string $model = null, array $options = []): ResultInterface
+    {
         $resolvedModel = $this->resolveModel($model);
-        
-        // Normalize input to UserPrompt or Conversation
         $normalizedInput = $this->normalizeInput($input);
 
         return $this->invoke($resolvedModel, $normalizedInput, $options);
@@ -66,32 +62,26 @@ final readonly class Platform implements PlatformInterface
 
     public function getProvider(string $name): ProviderInterface
     {
-        $clientsArray = is_array($this->clients) ? $this->clients : iterator_to_array($this->clients);
-
-        foreach ($clientsArray as $client) {
-            $provider = $client->getProvider();
-            if ($provider->getId() === $name) {
-                return $provider;
-            }
+        $provider = $this->getAvailableProviders()->get($name);
+        if ($provider !== null) {
+            return $provider;
         }
 
         throw new InvalidArgumentException(sprintf(
             'Provider "%s" not found. Available providers: %s',
             $name,
-            implode(', ', $this->getAvailableProviders())
+            $this->getAvailableProviders()
         ));
     }
 
-    public function getAvailableProviders(): array
+    public function getAvailableProviders(): ProviderCollection
     {
-        $providers = [];
-        $clientsArray = is_array($this->clients) ? $this->clients : iterator_to_array($this->clients);
-
-        foreach ($clientsArray as $client) {
-            $providers[] = $client->getProvider()->getId();
+        $collection = new ProviderCollection();
+        foreach ($this->clients as $client) {
+            $collection->add($client->getProvider());
         }
 
-        return array_unique($providers);
+        return $collection;
     }
 
     public function hasProvider(string $name): bool
@@ -253,7 +243,7 @@ final readonly class Platform implements PlatformInterface
     private function resolveModel(?string $modelId): ModelInterface
     {
         $clients = is_array($this->clients) ? $this->clients : iterator_to_array($this->clients);
-        
+
         if ($modelId === null) {
             // No model specified - use default behavior
             if (count($clients) === 1) {
@@ -263,7 +253,7 @@ final readonly class Platform implements PlatformInterface
 
                 return $client->getProvider()->getModel($defaultModelId);
             }
-            
+
             // Multiple clients - try to use the default provider if configured
             if ($this->defaultProvider !== null) {
                 foreach ($clients as $client) {
@@ -274,13 +264,13 @@ final readonly class Platform implements PlatformInterface
                         return $provider->getModel($defaultModelId);
                     }
                 }
-                
+
                 throw new InvalidArgumentException(
                     "Default provider '{$this->defaultProvider}' not found in configured clients. " .
-                    "Available providers: " . implode(', ', $this->getAvailableProviders())
+                    "Available providers: " . $this->getAvailableProviders()
                 );
             }
-            
+
             throw new InvalidArgumentException(
                 'Multiple providers configured. Must specify model parameter or configure the default provider. Available models: ' .
                 implode(', ', $this->getAvailableModels())
@@ -315,15 +305,15 @@ final readonly class Platform implements PlatformInterface
         if (is_string($input)) {
             return UserPrompt::create($input);
         }
-        
+
         if ($input instanceof Conversation) {
             return $input;
         }
-        
+
         if ($input instanceof UserPrompt) {
             return $input;
         }
-        
+
         // For other Prompt types (SystemPrompt, AssistantPrompt), wrap in Conversation
         return Conversation::fromUser(UserPrompt::create($input->getContent()));
     }
@@ -337,12 +327,12 @@ final readonly class Platform implements PlatformInterface
     {
         $models = [];
         $clients = is_array($this->clients) ? $this->clients : iterator_to_array($this->clients);
-        
+
         foreach ($clients as $client) {
             $provider = $client->getProvider();
             $models = array_merge($models, $provider->getAvailableModels());
         }
-        
+
         return array_unique($models);
     }
 
@@ -390,16 +380,16 @@ final readonly class Platform implements PlatformInterface
                 'No audio-capable clients found. Audio processing requires a client that implements %s. ' .
                 'Available providers: %s. Currently, only OpenAI supports audio processing.',
                 AudioCapableInterface::class,
-                implode(', ', $this->getAvailableProviders())
+                $this->getAvailableProviders()
             ));
         }
-        
+
         // We have audio clients but none support these options
         $availableAudioProviders = array_map(
             static fn (AudioCapableInterface $client) => $client->getProvider()->getId(),
             $audioClients
         );
-        
+
         throw new InvalidArgumentException(sprintf(
             'Audio options provider mismatch. Available audio providers: %s, but options are for "%s"',
             implode(', ', array_unique($availableAudioProviders)),

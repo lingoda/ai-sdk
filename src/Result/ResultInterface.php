@@ -10,4 +10,11 @@ interface ResultInterface
      * Get the content of the result.
      */
     public function getContent(): mixed;
+
+    /**
+     * Get additional metadata associated with the result.
+     *
+     * @return array<string, mixed>
+     */
+    public function getMetadata(): array;
 }

@@ -1,20 +1,19 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit;
 
-use Lingoda\AiSdk\Platform;
-use Lingoda\AiSdk\Provider\OpenAIProvider;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ModelNotFoundException;
-use Lingoda\AiSdk\Exception\RuntimeException;
-use Lingoda\AiSdk\ModelInterface;
-use Lingoda\AiSdk\ProviderInterface;
-use Lingoda\AiSdk\Prompt\UserPrompt;
+use Lingoda\AiSdk\Platform;
 use Lingoda\AiSdk\Prompt\Conversation;
 use Lingoda\AiSdk\Prompt\SystemPrompt;
+use Lingoda\AiSdk\Prompt\UserPrompt;
+use Lingoda\AiSdk\Provider\OpenAIProvider;
+use Lingoda\AiSdk\Provider\ProviderCollection;
+use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\TextResult;
 use PHPUnit\Framework\TestCase;
 
@@ -24,13 +23,14 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         // Create a mock client that supports our model
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Test response', ['id' => 'test']));
+            ->willReturn(new TextResult('Test response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask('Hello', $model->getId());
@@ -54,7 +54,7 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         // Create a client that doesn't support our model
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(false);
@@ -73,7 +73,7 @@ final class PlatformTest extends TestCase
         $client->method('getProvider')->willReturn($provider);
 
         $platform = new Platform([$client]);
-        
+
         $this->assertSame($provider, $platform->getProvider('openai'));
     }
 
@@ -103,10 +103,11 @@ final class PlatformTest extends TestCase
         $client2->method('getProvider')->willReturn($provider2);
 
         $platform = new Platform([$client1, $client2]);
-        
+
         $providers = $platform->getAvailableProviders();
-        $this->assertContains('openai', $providers);
-        $this->assertContains('anthropic', $providers);
+        $this->assertInstanceOf(ProviderCollection::class, $providers);
+        $this->assertContains('openai', $providers->getIds());
+        $this->assertContains('anthropic', $providers->getIds());
         $this->assertCount(2, $providers);
     }
 
@@ -119,9 +120,10 @@ final class PlatformTest extends TestCase
         $client2->method('getProvider')->willReturn($provider);
 
         $platform = new Platform([$client1, $client2]);
-        
+
         $providers = $platform->getAvailableProviders();
-        $this->assertEquals(['openai'], $providers);
+        $this->assertInstanceOf(ProviderCollection::class, $providers);
+        $this->assertEquals(['openai'], $providers->getIds());
     }
 
     public function testHasProvider(): void
@@ -131,7 +133,7 @@ final class PlatformTest extends TestCase
         $client->method('getProvider')->willReturn($provider);
 
         $platform = new Platform([$client]);
-        
+
         $this->assertTrue($platform->hasProvider('openai'));
         $this->assertFalse($platform->hasProvider('unknown'));
     }
@@ -140,12 +142,13 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask('Hello world', $model->getId());
@@ -159,12 +162,13 @@ final class PlatformTest extends TestCase
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
         $userPrompt = UserPrompt::create('Hello from prompt');
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask($userPrompt, $model->getId());
@@ -178,12 +182,13 @@ final class PlatformTest extends TestCase
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
         $conversation = Conversation::fromUser(UserPrompt::create('Hello'));
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask($conversation, $model->getId());
@@ -196,12 +201,13 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask('Hello world', null);
@@ -214,12 +220,13 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         $client1 = $this->createMock(ClientInterface::class);
         $client1->method('supports')->with($model)->willReturn(true);
         $client1->method('getProvider')->willReturn($provider);
         $client1->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $provider2 = $this->createMock(ProviderInterface::class);
         $provider2->method('getId')->willReturn('anthropic');
@@ -289,12 +296,13 @@ final class PlatformTest extends TestCase
     {
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client], false); // Disable sanitization
         $result = $platform->ask('Hello world', $model->getId());
@@ -308,12 +316,13 @@ final class PlatformTest extends TestCase
         $provider = new OpenAIProvider();
         $model = $provider->getModel('gpt-4o-mini');
         $systemPrompt = SystemPrompt::create('You are a helpful assistant');
-        
+
         $client = $this->createMock(ClientInterface::class);
         $client->method('supports')->with($model)->willReturn(true);
         $client->method('getProvider')->willReturn($provider);
         $client->method('request')
-            ->willReturn(new TextResult('Response', ['id' => 'test']));
+            ->willReturn(new TextResult('Response', ['id' => 'test']))
+        ;
 
         $platform = new Platform([$client]);
         $result = $platform->ask($systemPrompt, $model->getId());
@@ -326,9 +335,10 @@ final class PlatformTest extends TestCase
     public function testGetAvailableProvidersWithEmptyClients(): void
     {
         $platform = new Platform([]);
-        
+
         $providers = $platform->getAvailableProviders();
-        $this->assertEquals([], $providers);
+        $this->assertInstanceOf(ProviderCollection::class, $providers);
+        $this->assertTrue($providers->isEmpty());
     }
 
     public function testConfigureProviderDefaultModel(): void
@@ -338,13 +348,13 @@ final class PlatformTest extends TestCase
         $client->method('getProvider')->willReturn($provider);
 
         $platform = new Platform([$client]);
-        
+
         // Verify initial default model
         $this->assertEquals('gpt-4o-mini', $provider->getDefaultModel());
-        
+
         // Configure new default model
         $platform->configureProviderDefaultModel('openai', 'gpt-4o');
-        
+
         // Verify the default model was updated
         $this->assertEquals('gpt-4o', $provider->getDefaultModel());
     }
@@ -356,13 +366,13 @@ final class PlatformTest extends TestCase
         $client->method('getProvider')->willReturn($provider);
 
         $platform = new Platform([$client]);
-        
+
         // Verify initial default model
         $this->assertEquals('gpt-4o-mini', $provider->getDefaultModel());
-        
+
         // Configure default model for non-existent provider (should do nothing)
         $platform->configureProviderDefaultModel('anthropic', 'claude-3-sonnet');
-        
+
         // Verify the OpenAI default model was not changed
         $this->assertEquals('gpt-4o-mini', $provider->getDefaultModel());
     }
@@ -375,13 +385,13 @@ final class PlatformTest extends TestCase
 
         $iterator = new \ArrayIterator([$client]);
         $platform = new Platform($iterator);
-        
+
         // Verify initial default model
         $this->assertEquals('gpt-4o-mini', $provider->getDefaultModel());
-        
+
         // Configure new default model
         $platform->configureProviderDefaultModel('openai', 'gpt-4o');
-        
+
         // Verify the default model was updated
         $this->assertEquals('gpt-4o', $provider->getDefaultModel());
     }

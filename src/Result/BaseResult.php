@@ -14,11 +14,6 @@ abstract class BaseResult implements ResultInterface
     ) {
     }
 
-    /**
-     * Get additional metadata associated with the result.
-     *
-     * @return array<string, mixed>
-     */
     public function getMetadata(): array
     {
         return $this->metadata;
