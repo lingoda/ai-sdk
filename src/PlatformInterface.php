@@ -89,6 +89,14 @@ interface PlatformInterface
     public function getProvider(string $name): ProviderInterface;
 
     /**
+     * Resolve model based on model ID or default selection.
+     *
+     * @throws InvalidArgumentException if no model can be resolved
+     * @throws ModelNotFoundException if the specified model is not found
+     */
+    public function resolveModel(?string $modelId): ModelInterface;
+
+    /**
      * Get a collection of all available providers.
      */
     public function getAvailableProviders(): ProviderCollection;

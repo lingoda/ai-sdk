@@ -194,53 +194,12 @@ final readonly class Platform implements PlatformInterface
     }
 
     /**
-     * @param array<string, mixed> $options Additional options for the request
-     *
-     * @throws RuntimeException|ClientException
-     */
-    private function invoke(ModelInterface $model, Prompt|Conversation $input, array $options = []): ResultInterface
-    {
-        $client = $this->findClientForModel($model);
-
-        // Convert Prompt to Conversation if needed
-        if ($input instanceof Conversation) {
-            $conversation = $input;
-        } elseif ($input instanceof UserPrompt) {
-            $conversation = Conversation::fromUser($input);
-        } else {
-            // For other Prompt types, create UserPrompt from content
-            $conversation = Conversation::fromUser(UserPrompt::create($input->getContent()));
-        }
-
-        // Sanitize conversation if enabled
-        if ($this->enableSanitization && $this->sanitizer !== null) {
-            $originalConversation = $conversation;
-            $conversation = $conversation->sanitize($this->sanitizer);
-
-            // Log sanitization if content was changed
-            if (!$conversation->equals($originalConversation)) {
-                $this->logger->info('Sensitive data sanitized in user prompt before API request', [
-                    'provider' => $model->getProvider()->getId(),
-                    'model' => $model->getId(),
-                    'sanitization_applied' => true,
-                    'conversation_hash' => $conversation->hash(),
-                ]);
-            }
-        }
-
-        // Convert conversation to appropriate payload format
-        $payload = $conversation->toArray();
-
-        return $client->request($model, $payload, $options);
-    }
-
-    /**
      * Resolve model based on model ID or default selection.
      *
      * @throws InvalidArgumentException if no model can be resolved
      * @throws ModelNotFoundException if the specified model is not found
      */
-    private function resolveModel(?string $modelId): ModelInterface
+    public function resolveModel(?string $modelId): ModelInterface
     {
         $clients = is_array($this->clients) ? $this->clients : iterator_to_array($this->clients);
 
@@ -295,6 +254,47 @@ final readonly class Platform implements PlatformInterface
             $modelId,
             implode(', ', $this->getAvailableModels())
         ));
+    }
+
+    /**
+     * @param array<string, mixed> $options Additional options for the request
+     *
+     * @throws RuntimeException|ClientException
+     */
+    private function invoke(ModelInterface $model, Prompt|Conversation $input, array $options = []): ResultInterface
+    {
+        $client = $this->findClientForModel($model);
+
+        // Convert Prompt to Conversation if needed
+        if ($input instanceof Conversation) {
+            $conversation = $input;
+        } elseif ($input instanceof UserPrompt) {
+            $conversation = Conversation::fromUser($input);
+        } else {
+            // For other Prompt types, create UserPrompt from content
+            $conversation = Conversation::fromUser(UserPrompt::create($input->getContent()));
+        }
+
+        // Sanitize conversation if enabled
+        if ($this->enableSanitization && $this->sanitizer !== null) {
+            $originalConversation = $conversation;
+            $conversation = $conversation->sanitize($this->sanitizer);
+
+            // Log sanitization if content was changed
+            if (!$conversation->equals($originalConversation)) {
+                $this->logger->info('Sensitive data sanitized in user prompt before API request', [
+                    'provider' => $model->getProvider()->getId(),
+                    'model' => $model->getId(),
+                    'sanitization_applied' => true,
+                    'conversation_hash' => $conversation->hash(),
+                ]);
+            }
+        }
+
+        // Convert conversation to appropriate payload format
+        $payload = $conversation->toArray();
+
+        return $client->request($model, $payload, $options);
     }
 
     /**
