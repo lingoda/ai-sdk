@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Result;
 
@@ -11,11 +11,11 @@ use stdClass;
 
 final class ObjectResultTest extends ResultTestCase
 {
-    protected function createResult($content, array $metadata = []): ResultInterface
+    protected function createResult(mixed $content, array $metadata = []): ResultInterface
     {
         return new ObjectResult($content, $metadata);
     }
-    
+
     protected function getExpectedContent(): mixed
     {
         $obj = new stdClass();
@@ -23,7 +23,7 @@ final class ObjectResultTest extends ResultTestCase
         $obj->number = 42;
         return $obj;
     }
-    
+
     /**
      * Test with stdClass object.
      */
@@ -32,37 +32,37 @@ final class ObjectResultTest extends ResultTestCase
         $content = new stdClass();
         $content->name = 'John Doe';
         $content->age = 30;
-        
+
         $result = new ObjectResult($content);
-        
+
         $this->assertSame($content, $result->getContent());
         $this->assertEquals('John Doe', $result->getContent()->name);
         $this->assertEquals(30, $result->getContent()->age);
     }
-    
+
     /**
      * Test with custom object.
      */
     public function testWithCustomObject(): void
     {
-        $content = new class {
+        $content = new class() {
             public string $property = 'test';
             public int $number = 42;
-            
+
             public function getProperty(): string
             {
                 return $this->property;
             }
         };
-        
+
         $result = new ObjectResult($content);
-        
+
         $this->assertSame($content, $result->getContent());
         $this->assertEquals('test', $result->getContent()->property);
         $this->assertEquals(42, $result->getContent()->number);
         $this->assertEquals('test', $result->getContent()->getProperty());
     }
-    
+
     /**
      * Test that getContent returns exact same object instance.
      */
@@ -70,17 +70,17 @@ final class ObjectResultTest extends ResultTestCase
     {
         $originalObject = new stdClass();
         $originalObject->data = ['key' => 'value'];
-        
+
         $result = new ObjectResult($originalObject);
         $retrievedObject = $result->getContent();
-        
+
         $this->assertSame($originalObject, $retrievedObject);
-        
+
         // Modifying the original object should affect the retrieved object
         $originalObject->newProperty = 'new value';
         $this->assertEquals('new value', $retrievedObject->newProperty);
     }
-    
+
     /**
      * Test with complex nested object.
      */
@@ -99,15 +99,15 @@ final class ObjectResultTest extends ResultTestCase
                 'timezone' => 'UTC'
             ]
         ];
-        
+
         $result = new ObjectResult($content);
-        
+
         $this->assertEquals(123, $result->getContent()->user->id);
         $this->assertEquals('user@example.com', $result->getContent()->user->profile->email);
         $this->assertEquals('dark', $result->getContent()->settings['theme']);
         $this->assertEquals('en', $result->getContent()->settings['preferences']['language']);
     }
-    
+
     /**
      * Test with ArrayObject.
      */
@@ -115,13 +115,13 @@ final class ObjectResultTest extends ResultTestCase
     {
         $content = new ArrayObject(['key1' => 'value1', 'key2' => 'value2']);
         $result = new ObjectResult($content);
-        
+
         $this->assertSame($content, $result->getContent());
         $this->assertInstanceOf(ArrayObject::class, $result->getContent());
         $this->assertEquals('value1', $result->getContent()['key1']);
         $this->assertEquals('value2', $result->getContent()['key2']);
     }
-    
+
     /**
      * Test with empty object.
      */
@@ -129,7 +129,7 @@ final class ObjectResultTest extends ResultTestCase
     {
         $content = new stdClass();
         $result = new ObjectResult($content);
-        
+
         $this->assertSame($content, $result->getContent());
         $this->assertEquals([], get_object_vars($result->getContent()));
     }

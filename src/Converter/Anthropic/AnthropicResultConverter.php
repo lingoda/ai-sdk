@@ -13,12 +13,20 @@ use Lingoda\AiSdk\Result\ResultInterface;
 use Lingoda\AiSdk\Result\TextResult;
 use Lingoda\AiSdk\Result\ToolCall;
 use Lingoda\AiSdk\Result\ToolCallResult;
+use Lingoda\AiSdk\Usage\Anthropic\AnthropicUsageExtractor;
 
 /**
  * @template-implements ResultConverterInterface<CreateResponse>
  */
 final class AnthropicResultConverter implements ResultConverterInterface
 {
+    private AnthropicUsageExtractor $usageExtractor;
+
+    public function __construct()
+    {
+        $this->usageExtractor = new AnthropicUsageExtractor();
+    }
+
     public function supports(ModelInterface $model, mixed $response): bool
     {
         return $model->getProvider()->is(AIProvider::ANTHROPIC)
@@ -32,7 +40,9 @@ final class AnthropicResultConverter implements ResultConverterInterface
         }
 
         $responseArray = $response->toArray();
-        
+        $rawUsage = $responseArray['usage'] ?? [];
+        $usage = !empty($rawUsage) ? $this->usageExtractor->extract($rawUsage) : null;
+
         // Extract metadata with support for current Anthropic response format
         $metadata = [
             'id' => $responseArray['id'] ?? '',
@@ -41,22 +51,22 @@ final class AnthropicResultConverter implements ResultConverterInterface
             'role' => $responseArray['role'] ?? null,
             'stop_reason' => $responseArray['stop_reason'] ?? null,
             'stop_sequence' => $responseArray['stop_sequence'] ?? null,
-            'usage' => $responseArray['usage'] ?? [],
+            'usage' => $rawUsage,
         ];
 
         // Check for tool calls in content
         $toolCalls = [];
         $textContent = '';
-        
+
         $content = $responseArray['content'] ?? [];
         if (is_array($content)) {
             foreach ($content as $contentBlock) {
                 if (!is_array($contentBlock)) {
                     continue;
                 }
-                
+
                 $type = $contentBlock['type'] ?? '';
-                
+
                 if ($type === 'tool_use') {
                     $toolCalls[] = new ToolCall(
                         (string) ($contentBlock['id'] ?? ''),
@@ -71,10 +81,10 @@ final class AnthropicResultConverter implements ResultConverterInterface
 
         // Return tool calls if any exist
         if (!empty($toolCalls)) {
-            return new ToolCallResult($metadata, ...$toolCalls);
+            return (new ToolCallResult($metadata, ...$toolCalls))->withUsage($usage);
         }
 
         // Default to text result
-        return new TextResult($textContent, $metadata);
+        return (new TextResult($textContent, $metadata))->withUsage($usage);
     }
 }

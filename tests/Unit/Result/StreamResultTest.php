@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Result;
 
@@ -12,19 +12,19 @@ use Nyholm\Psr7\Stream;
 
 final class StreamResultTest extends ResultTestCase
 {
-    protected function createResult($content, array $metadata = []): ResultInterface
+    protected function createResult(mixed $content, array $metadata = []): ResultInterface
     {
         if (is_array($content)) {
             $content = Stream::create(implode('', $content));
         }
         return new StreamResult($content, 'text/plain', $metadata);
     }
-    
+
     protected function getExpectedContent(): mixed
     {
         return Stream::create('chunk1chunk2chunk3');
     }
-    
+
     /**
      * Test with array stream.
      */
@@ -33,11 +33,11 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'Hello World!';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $this->assertSame($stream, $result->getContent());
         $this->assertTrue($result->getContent()->isReadable());
     }
-    
+
     /**
      * Test with generator.
      */
@@ -46,15 +46,15 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'firstsecondthird';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $content = '';
         foreach ($result as $chunk) {
             $content .= $chunk;
         }
-        
+
         $this->assertEquals($streamData, $content);
     }
-    
+
     /**
      * Test toString method with array.
      */
@@ -63,10 +63,10 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'Hello World!';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $this->assertEquals($streamData, (string) $result->getContent());
     }
-    
+
     /**
      * Test toString with empty stream.
      */
@@ -74,10 +74,10 @@ final class StreamResultTest extends ResultTestCase
     {
         $stream = Stream::create('');
         $result = new StreamResult($stream);
-        
+
         $this->assertEquals('', (string) $result->getContent());
     }
-    
+
     /**
      * Test toString with generator.
      */
@@ -86,10 +86,10 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'The quick brown fox';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $this->assertEquals($streamData, (string) $result->getContent());
     }
-    
+
     /**
      * Test content is properly iterable.
      */
@@ -98,17 +98,17 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'abc';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $this->assertInstanceOf(\IteratorAggregate::class, $result);
-        
+
         $collected = '';
         foreach ($result as $chunk) {
             $collected .= $chunk;
         }
-        
+
         $this->assertEquals($streamData, $collected);
     }
-    
+
     /**
      * Test with complex stream data (SSE format).
      */
@@ -116,23 +116,23 @@ final class StreamResultTest extends ResultTestCase
     {
         $streamData = 'data: {"type": "start", "content": "Hello"}data: {"type": "content", "content": " there"}data: {"type": "content", "content": "!"}data: {"type": "end", "content": ""}';
         $stream = Stream::create($streamData);
-        
+
         $metadata = [
             'provider' => 'anthropic',
             'model' => 'claude-3-haiku',
             'stream_format' => 'server-sent-events'
         ];
-        
+
         $result = new StreamResult($stream, 'text/event-stream', $metadata);
-        
+
         $this->assertSame($stream, $result->getContent());
         $this->assertEquals($metadata, $result->getMetadata());
-        
+
         $fullContent = (string) $result->getContent();
         $this->assertStringContainsString('Hello', $fullContent);
         $this->assertStringContainsString('there', $fullContent);
     }
-    
+
     /**
      * Test multiple iterations over same content.
      */
@@ -141,26 +141,26 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'chunk1chunk2chunk3';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         // First iteration
         $first = '';
         foreach ($result as $chunk) {
             $first .= $chunk;
         }
-        
+
         // Reset stream for second iteration
         $stream->rewind();
-        
+
         // Second iteration
         $second = '';
         foreach ($result as $chunk) {
             $second .= $chunk;
         }
-        
+
         $this->assertEquals($first, $second);
         $this->assertEquals($streamData, $first);
     }
-    
+
     /**
      * Test toString with Unicode and special characters.
      */
@@ -169,10 +169,10 @@ final class StreamResultTest extends ResultTestCase
         $expected = 'Hello 🌍 world! Ñiño café ☕';
         $stream = Stream::create($expected);
         $result = new StreamResult($stream);
-        
+
         $this->assertEquals($expected, (string) $result->getContent());
     }
-    
+
     /**
      * Test with ArrayIterator.
      */
@@ -181,11 +181,11 @@ final class StreamResultTest extends ResultTestCase
         $streamData = 'item1item2item3';
         $stream = Stream::create($streamData);
         $result = new StreamResult($stream);
-        
+
         $this->assertSame($stream, $result->getContent());
         $this->assertEquals($streamData, (string) $result->getContent());
     }
-    
+
     /**
      * Test with empty iterator.
      */
@@ -193,7 +193,7 @@ final class StreamResultTest extends ResultTestCase
     {
         $stream = Stream::create('');
         $result = new StreamResult($stream);
-        
+
         $this->assertSame($stream, $result->getContent());
         $this->assertEquals('', (string) $result->getContent());
     }

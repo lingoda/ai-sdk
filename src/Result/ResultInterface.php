@@ -17,4 +17,11 @@ interface ResultInterface
      * @return array<string, mixed>
      */
     public function getMetadata(): array;
+
+    /**
+     * Get token usage information for this result.
+     */
+    public function getUsage(): ?Usage;
+
+    public function withUsage(?Usage $usage): static;
 }

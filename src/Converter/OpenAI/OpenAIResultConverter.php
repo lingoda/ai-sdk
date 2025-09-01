@@ -12,6 +12,7 @@ use Lingoda\AiSdk\Result\ResultInterface;
 use Lingoda\AiSdk\Result\TextResult;
 use Lingoda\AiSdk\Result\ToolCall;
 use Lingoda\AiSdk\Result\ToolCallResult;
+use Lingoda\AiSdk\Usage\OpenAI\OpenAIUsageExtractor;
 use OpenAI\Responses\Chat\CreateResponse;
 
 /**
@@ -19,6 +20,13 @@ use OpenAI\Responses\Chat\CreateResponse;
  */
 final class OpenAIResultConverter implements ResultConverterInterface
 {
+    private OpenAIUsageExtractor $usageExtractor;
+
+    public function __construct()
+    {
+        $this->usageExtractor = new OpenAIUsageExtractor();
+    }
+
     public function supports(ModelInterface $model, mixed $response): bool
     {
         return $model->getProvider()->is(AIProvider::OPENAI)
@@ -33,7 +41,24 @@ final class OpenAIResultConverter implements ResultConverterInterface
 
         $choice = $response->choices[0];
         $message = $choice->message;
-        
+
+        $rawUsage = [
+            'prompt_tokens' => $response->usage->promptTokens ?? 0,
+            'completion_tokens' => $response->usage->completionTokens ?? 0,
+            'total_tokens' => $response->usage->totalTokens ?? 0,
+            'prompt_tokens_details' => [
+                'cached_tokens' => $response->usage->promptTokensDetails->cachedTokens ?? 0,
+                'audio_tokens' => $response->usage->promptTokensDetails->audioTokens ?? 0,
+            ],
+            'completion_tokens_details' => [
+                'reasoning_tokens' => $response->usage->completionTokensDetails->reasoningTokens ?? 0,
+                'audio_tokens' => $response->usage->completionTokensDetails->audioTokens ?? 0,
+                'accepted_prediction_tokens' => $response->usage->completionTokensDetails->acceptedPredictionTokens ?? 0,
+                'rejected_prediction_tokens' => $response->usage->completionTokensDetails->rejectedPredictionTokens ?? 0,
+            ],
+        ];
+        $usage = $this->usageExtractor->extract($rawUsage);
+
         // Extract metadata with support for new OpenAI response format
         $metadata = [
             'id' => $response->id,
@@ -41,21 +66,7 @@ final class OpenAIResultConverter implements ResultConverterInterface
             'model' => $response->model,
             'created' => $response->created,
             'finish_reason' => $choice->finishReason,
-            'usage' => [
-                'prompt_tokens' => $response->usage->promptTokens ?? 0,
-                'completion_tokens' => $response->usage->completionTokens ?? 0,
-                'total_tokens' => $response->usage->totalTokens ?? 0,
-                'prompt_tokens_details' => [
-                    'cached_tokens' => $response->usage->promptTokensDetails->cachedTokens ?? 0,
-                    'audio_tokens' => $response->usage->promptTokensDetails->audioTokens ?? 0,
-                ],
-                'completion_tokens_details' => [
-                    'reasoning_tokens' => $response->usage->completionTokensDetails->reasoningTokens ?? 0,
-                    'audio_tokens' => $response->usage->completionTokensDetails->audioTokens ?? 0,
-                    'accepted_prediction_tokens' => $response->usage->completionTokensDetails->acceptedPredictionTokens ?? 0,
-                    'rejected_prediction_tokens' => $response->usage->completionTokensDetails->rejectedPredictionTokens ?? 0,
-                ],
-            ],
+            'usage' => $rawUsage,
             'system_fingerprint' => $response->systemFingerprint,
             'index' => $choice->index ?? 0,
         ];
@@ -63,27 +74,27 @@ final class OpenAIResultConverter implements ResultConverterInterface
         // Check if response contains tool calls
         if (!empty($message->toolCalls)) {
             $toolCalls = [];
-            
+
             foreach ($message->toolCalls as $toolCall) {
                 $arguments = [];
                 if ($toolCall->function->arguments) {
                     /** @var array<string, mixed> $arguments */
                     $arguments = json_decode($toolCall->function->arguments, true, 512, JSON_THROW_ON_ERROR) ?? [];
                 }
-                
+
                 $toolCalls[] = new ToolCall(
                     $toolCall->id,
                     $toolCall->function->name,
                     $arguments
                 );
             }
-            
-            return new ToolCallResult($metadata, ...$toolCalls);
+
+            return (new ToolCallResult($metadata, ...$toolCalls))->withUsage($usage);
         }
 
         // Default to text result
         $content = $message->content ?? '';
 
-        return new TextResult($content, $metadata);
+        return (new TextResult($content, $metadata))->withUsage($usage);
     }
 }
