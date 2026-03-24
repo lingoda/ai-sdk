@@ -22,7 +22,7 @@ final readonly class Conversation
     private ?SystemPrompt $systemPrompt;
     private ?AssistantPrompt $assistantPrompt;
     private bool $isSanitized;
-    
+
     /**
      * @param UserPrompt $userPrompt The user's input (required)
      * @param SystemPrompt|null $systemPrompt System instructions/context
@@ -40,7 +40,7 @@ final readonly class Conversation
         $this->assistantPrompt = $assistantPrompt;
         $this->isSanitized = $isSanitized;
     }
-    
+
     /**
      * Create a conversation from just a user prompt
      */
@@ -48,7 +48,7 @@ final readonly class Conversation
     {
         return new self($prompt);
     }
-    
+
     /**
      * Create a conversation with system and user prompts
      */
@@ -56,7 +56,7 @@ final readonly class Conversation
     {
         return new self($user, $system);
     }
-    
+
     /**
      * Create a full conversation
      */
@@ -81,18 +81,19 @@ final readonly class Conversation
         if (isset($data['content']) && is_string($data['content'])) {
             return new self(UserPrompt::create($data['content']));
         }
-        
+
         // Handle messages array format
         if (isset($data['messages']) && is_array($data['messages'])) {
             $systemPrompt = null;
             $userPrompt = null;
             $assistantPrompt = null;
-            
+
             foreach ($data['messages'] as $message) {
-                if (!is_array($message) || !isset($message['role'], $message['content'])) {
+                if (!is_array($message) || !isset($message['role'], $message['content'])
+                    || !is_string($message['role']) || !is_string($message['content'])) {
                     continue;
                 }
-                
+
                 switch ($message['role']) {
                     case 'system':
                         $systemPrompt = SystemPrompt::create($message['content']);
@@ -105,14 +106,14 @@ final readonly class Conversation
                         break;
                 }
             }
-            
+
             if ($userPrompt === null) {
                 throw new InvalidArgumentException('No user message found in messages array');
             }
-            
+
             return new self($userPrompt, $systemPrompt, $assistantPrompt);
         }
-        
+
         // Handle other common fields
         $userFields = ['prompt', 'query', 'question', 'text', 'input', 'user'];
         foreach ($userFields as $field) {
@@ -124,10 +125,10 @@ final readonly class Conversation
                 );
             }
         }
-        
+
         throw new InvalidArgumentException('Unable to extract conversation from array data');
     }
-    
+
     /**
      * Get the user prompt
      */
@@ -135,7 +136,7 @@ final readonly class Conversation
     {
         return $this->userPrompt;
     }
-    
+
     /**
      * Get the system prompt
      */
@@ -143,7 +144,7 @@ final readonly class Conversation
     {
         return $this->systemPrompt;
     }
-    
+
     /**
      * Get the assistant prompt
      */
@@ -151,7 +152,7 @@ final readonly class Conversation
     {
         return $this->assistantPrompt;
     }
-    
+
     /**
      * Get the user prompt content as string
      */
@@ -159,7 +160,7 @@ final readonly class Conversation
     {
         return $this->userPrompt->getContent();
     }
-    
+
     /**
      * Get the system prompt content as string (null if not set)
      */
@@ -167,7 +168,7 @@ final readonly class Conversation
     {
         return $this->systemPrompt?->getContent();
     }
-    
+
     /**
      * Get the assistant prompt content as string (null if not set)
      */
@@ -175,7 +176,7 @@ final readonly class Conversation
     {
         return $this->assistantPrompt?->getContent();
     }
-    
+
     /**
      * Check if this conversation has been sanitized
      */
@@ -183,7 +184,7 @@ final readonly class Conversation
     {
         return $this->isSanitized;
     }
-    
+
     /**
      * Create a sanitized version of this conversation
      * Only sanitizes the user prompt, preserving system and assistant prompts
@@ -192,12 +193,12 @@ final readonly class Conversation
     {
         $originalUserContent = $this->userPrompt->getContent();
         $sanitizedUserContent = $sanitizer->sanitize($originalUserContent);
-        
+
         // If nothing changed, return the same instance
         if ($sanitizedUserContent === $originalUserContent) {
             return $this;
         }
-        
+
         // Create new sanitized instance with sanitized user prompt
         return new self(
             UserPrompt::create(is_string($sanitizedUserContent) ? $sanitizedUserContent : $originalUserContent),
@@ -206,7 +207,7 @@ final readonly class Conversation
             true // Mark as sanitized
         );
     }
-    
+
     /**
      * Add or update the system prompt
      */
@@ -219,7 +220,7 @@ final readonly class Conversation
             $this->isSanitized
         );
     }
-    
+
     /**
      * Add or update the assistant prompt
      */
@@ -232,7 +233,7 @@ final readonly class Conversation
             $this->isSanitized
         );
     }
-    
+
     /**
      * Convert to messages array format (common for chat APIs)
      *
@@ -241,20 +242,20 @@ final readonly class Conversation
     public function toArray(): array
     {
         $messages = [];
-        
+
         if ($this->systemPrompt !== null) {
             $messages[] = $this->systemPrompt->toArray();
         }
-        
+
         if ($this->assistantPrompt !== null) {
             $messages[] = $this->assistantPrompt->toArray();
         }
-        
+
         $messages[] = $this->userPrompt->toArray();
-        
+
         return $messages;
     }
-    
+
     /**
      * Convert to a simple string (returns user prompt)
      */
@@ -262,27 +263,27 @@ final readonly class Conversation
     {
         return $this->userPrompt->getContent();
     }
-    
+
     /**
      * Get the full text content for token estimation
      */
     public function getFullContent(): string
     {
         $parts = [];
-        
+
         if ($this->systemPrompt !== null) {
             $parts[] = $this->systemPrompt->getContent();
         }
-        
+
         if ($this->assistantPrompt !== null) {
             $parts[] = $this->assistantPrompt->getContent();
         }
-        
+
         $parts[] = $this->userPrompt->getContent();
-        
+
         return implode("\n", $parts);
     }
-    
+
     /**
      * Estimate the number of tokens in this conversation
      *
@@ -292,7 +293,7 @@ final readonly class Conversation
     {
         return $estimator($this->getFullContent());
     }
-    
+
     /**
      * Check if this conversation equals another
      */
@@ -304,7 +305,7 @@ final readonly class Conversation
             && (($this->assistantPrompt === null && $other->assistantPrompt === null)
                 || ($this->assistantPrompt !== null && $other->assistantPrompt !== null && $this->assistantPrompt->equals($other->assistantPrompt)));
     }
-    
+
     /**
      * Create a hash for caching purposes
      */
