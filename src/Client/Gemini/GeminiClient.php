@@ -26,7 +26,7 @@ final class GeminiClient implements ClientInterface
 {
     private ?GeminiResultConverter $resultConverter = null;
     private ?GeminiProvider $provider = null;
-    
+
     public function __construct(
         private readonly GeminiAPIClient $client,
         private readonly LoggerInterface $logger = new NullLogger(),
@@ -42,15 +42,15 @@ final class GeminiClient implements ClientInterface
     {
         try {
             $requestData = $this->buildChatPayload($model, $payload, $options);
-            
+
             $generativeModel = $this->client->generativeModel($model->getId());
-            
+
             // Apply generation config if provided
             if (isset($requestData['generationConfig'])) {
                 Assert::isInstanceOf($requestData['generationConfig'], GenerationConfig::class);
                 $generativeModel = $generativeModel->withGenerationConfig($requestData['generationConfig']);
             }
-            
+
             // Apply system instruction if provided
             if (isset($requestData['systemInstruction'])) {
                 Assert::isInstanceOf($requestData['systemInstruction'], Content::class);
@@ -61,7 +61,7 @@ final class GeminiClient implements ClientInterface
             // Ensure all contents are Content objects for safe unpacking
             $contentObjects = array_filter($requestData['contents'], fn ($content) => $content instanceof Content);
             $response = $generativeModel->generateContent(...$contentObjects);
-            
+
             return $this->getResultConverter()->convert($model, $response);
         } catch (\Throwable $e) {
             $this->logger->error('Gemini request failed', [
@@ -101,7 +101,7 @@ final class GeminiClient implements ClientInterface
     {
         $contents = [];
         $systemInstruction = null;
-        
+
         if (is_string($payload)) {
             // Simple user prompt
             $contents[] = new Content(
@@ -115,7 +115,7 @@ final class GeminiClient implements ClientInterface
                 foreach ($payload['contents'] as $content) {
                     if ($content instanceof Content) {
                         $contents[] = $content;
-                    } elseif (is_array($content) && isset($content['parts'], $content['role'])) {
+                    } elseif (is_array($content) && isset($content['parts'], $content['role']) && is_array($content['parts'])) {
                         // Convert array format to Content object
                         $parts = [];
                         foreach ($content['parts'] as $partData) {
@@ -129,6 +129,7 @@ final class GeminiClient implements ClientInterface
                 }
             } elseif (isset($payload[0]) && is_array($payload[0]) && isset($payload[0]['role'])) {
                 // Check if payload is already an array of message objects (from Conversation::toArray())
+                /** @var array{role: string, content: string} $message */
                 foreach ($payload as $message) {
                     if ($message['role'] === 'system') {
                         $systemInstruction = new Content(
@@ -145,10 +146,13 @@ final class GeminiClient implements ClientInterface
             } elseif (isset($payload['messages']) && is_array($payload['messages'])) {
                 // If messages array is provided directly, use it
                 foreach ($payload['messages'] as $message) {
-                    if (!is_array($message)) {
+                    if (!is_array($message) || !isset($message['role'], $message['content'])) {
                         continue;
                     }
-                    
+
+                    Assert::string($message['role']);
+                    Assert::string($message['content']);
+
                     if ($message['role'] === 'system') {
                         $systemInstruction = new Content(
                             parts: [new Part(text: $message['content'])]
@@ -163,28 +167,28 @@ final class GeminiClient implements ClientInterface
                 }
             } else {
                 // Structured payload with system/user/assistant messages
-                if (!empty($payload['user'])) {
+                if (!empty($payload['user']) && is_string($payload['user'])) {
                     $contents[] = new Content(
                         parts: [new Part(text: $payload['user'])],
                         role: Role::USER
                     );
                 }
-                
-                if (!empty($payload['assistant'])) {
+
+                if (!empty($payload['assistant']) && is_string($payload['assistant'])) {
                     $contents[] = new Content(
                         parts: [new Part(text: $payload['assistant'])],
                         role: Role::MODEL  // Gemini uses MODEL for assistant role
                     );
                 }
-                
+
                 // Gemini uses systemInstruction separately
-                if (!empty($payload['system'])) {
+                if (!empty($payload['system']) && is_string($payload['system'])) {
                     $systemInstruction = new Content(
                         parts: [new Part(text: $payload['system'])]
                     );
                 }
             }
-            
+
             // Throw exception if no valid contents found
             if (empty($contents)) {
                 throw new InvalidArgumentException('No valid contents found in payload. Payload must contain user message.');
@@ -199,7 +203,7 @@ final class GeminiClient implements ClientInterface
         // Build generation config from model options and request options
         $modelOptions = $model->getOptions();
         $generationConfigParams = [];
-        
+
         // Use max_tokens from options or model default
         if (isset($options['max_tokens']) && is_int($options['max_tokens'])) {
             $generationConfigParams['maxOutputTokens'] = $options['max_tokens'];
