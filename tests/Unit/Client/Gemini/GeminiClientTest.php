@@ -8,6 +8,9 @@ use Gemini\Client as GeminiAPIClient;
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
+use Gemini\Data\Schema;
+use Gemini\Enums\DataType;
+use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ClientException;
@@ -485,6 +488,169 @@ final class GeminiClientTest extends ClientTestCase
         self::assertInstanceOf(Content::class, $content);
         self::assertEquals(Role::USER, $content->role);
         self::assertSame('From contents array', $content->parts[0]->text); // Should use contents, not messages
+    }
+
+    public function testBuildChatPayloadWithResponseMimeTypeAndSchema(): void
+    {
+        $payload = 'Test message';
+        $schema = [
+            'type' => 'OBJECT',
+            'properties' => [
+                'status' => [
+                    'type' => 'STRING',
+                    'enum' => ['ok', 'error'],
+                ],
+                'tags' => [
+                    'type' => 'ARRAY',
+                    'items' => ['type' => 'STRING'],
+                ],
+            ],
+            'required' => ['status'],
+        ];
+        $options = [
+            'response_mime_type' => 'application/json',
+            'response_schema' => $schema,
+        ];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(ResponseMimeType::APPLICATION_JSON, $result['generationConfig']->responseMimeType);
+        self::assertInstanceOf(Schema::class, $result['generationConfig']->responseSchema);
+        self::assertEquals($schema, $result['generationConfig']->responseSchema->toArray());
+    }
+
+    public function testBuildChatPayloadWithPrebuiltResponseSchemaAndMimeType(): void
+    {
+        $payload = 'Test message';
+        $schema = new Schema(
+            type: DataType::OBJECT,
+            properties: ['result' => new Schema(type: DataType::STRING)],
+            required: ['result'],
+        );
+        $options = [
+            'response_mime_type' => ResponseMimeType::APPLICATION_JSON,
+            'response_schema' => $schema,
+        ];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(ResponseMimeType::APPLICATION_JSON, $result['generationConfig']->responseMimeType);
+        self::assertSame($schema, $result['generationConfig']->responseSchema); // Passed through unchanged
+    }
+
+    public function testBuildChatPayloadWithResponseOptionsFromModel(): void
+    {
+        $payload = 'Test message';
+        $options = [];
+
+        // Create a new mock for this specific test to avoid conflicts
+        $model = $this->createMock(ModelInterface::class);
+        $model->method('getId')->willReturn('gemini-2.0-flash-exp');
+        $model->method('getOptions')->willReturn([
+            'responseMimeType' => 'application/json',
+            'responseSchema' => ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]],
+        ]);
+        $model->method('getMaxTokens')->willReturn(8192);
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(ResponseMimeType::APPLICATION_JSON, $result['generationConfig']->responseMimeType);
+        self::assertInstanceOf(Schema::class, $result['generationConfig']->responseSchema);
+        self::assertEquals(
+            ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]],
+            $result['generationConfig']->responseSchema->toArray()
+        );
+    }
+
+    public function testBuildChatPayloadWithInvalidResponseSchemaType(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => ['type' => 'INVALID_TYPE'],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid response schema type "INVALID_TYPE".');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithMissingResponseSchemaType(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => ['properties' => ['result' => ['type' => 'STRING']]],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Response schema must define a "type" as string.');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithInvalidResponseMimeType(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_mime_type' => 'application/xml',
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid response MIME type "application/xml".');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithResponseSchemaWithoutMimeType(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('response_schema requires response_mime_type "application/json".');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithLowercaseResponseSchemaTypes(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_mime_type' => 'application/json',
+            'response_schema' => [
+                'type' => 'object',
+                'properties' => ['result' => ['type' => 'string']],
+                'required' => ['result'],
+            ],
+        ];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertInstanceOf(Schema::class, $result['generationConfig']->responseSchema);
+        self::assertSame(DataType::OBJECT, $result['generationConfig']->responseSchema->type);
+        self::assertSame(DataType::STRING, $result['generationConfig']->responseSchema->properties['result']->type);
+        self::assertEquals(
+            ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']], 'required' => ['result']],
+            $result['generationConfig']->responseSchema->toArray() // Normalized to uppercase type names
+        );
+    }
+
+    public function testBuildChatPayloadWithoutResponseOptionsKeepsDefaults(): void
+    {
+        $payload = 'Test message';
+        $options = [];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(ResponseMimeType::TEXT_PLAIN, $result['generationConfig']->responseMimeType); // Constructor default
+        self::assertNull($result['generationConfig']->responseSchema);
     }
 
     public function testGetProviderReturnsGeminiProvider(): void

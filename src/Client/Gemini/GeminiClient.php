@@ -8,6 +8,9 @@ use Gemini\Client as GeminiAPIClient;
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
+use Gemini\Data\Schema;
+use Gemini\Enums\DataType;
+use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter;
@@ -234,6 +237,26 @@ final class GeminiClient implements ClientInterface
             $generationConfigParams['topK'] = $modelOptions['topK'];
         }
 
+        // Use responseMimeType from options or model default
+        if (isset($options['response_mime_type']) && (is_string($options['response_mime_type']) || $options['response_mime_type'] instanceof ResponseMimeType)) {
+            $generationConfigParams['responseMimeType'] = $this->resolveResponseMimeType($options['response_mime_type']);
+        } elseif (isset($modelOptions['responseMimeType']) && (is_string($modelOptions['responseMimeType']) || $modelOptions['responseMimeType'] instanceof ResponseMimeType)) {
+            $generationConfigParams['responseMimeType'] = $this->resolveResponseMimeType($modelOptions['responseMimeType']);
+        }
+
+        // Use responseSchema from options or model default
+        if (isset($options['response_schema']) && (is_array($options['response_schema']) || $options['response_schema'] instanceof Schema)) {
+            $generationConfigParams['responseSchema'] = $this->resolveResponseSchema($options['response_schema']);
+        } elseif (isset($modelOptions['responseSchema']) && (is_array($modelOptions['responseSchema']) || $modelOptions['responseSchema'] instanceof Schema)) {
+            $generationConfigParams['responseSchema'] = $this->resolveResponseSchema($modelOptions['responseSchema']);
+        }
+
+        // Gemini only honours a response schema together with a JSON response MIME type
+        if (isset($generationConfigParams['responseSchema'])
+            && ($generationConfigParams['responseMimeType'] ?? null) !== ResponseMimeType::APPLICATION_JSON) {
+            throw new InvalidArgumentException('response_schema requires response_mime_type "application/json".');
+        }
+
         if (count($generationConfigParams) > 0) {
             $requestData['generationConfig'] = new GenerationConfig(...$generationConfigParams);
         }
@@ -244,5 +267,105 @@ final class GeminiClient implements ClientInterface
         }
 
         return $requestData;
+    }
+
+    /**
+     * Normalize a response MIME type option into a ResponseMimeType enum.
+     *
+     * @throws InvalidArgumentException
+     */
+    private function resolveResponseMimeType(ResponseMimeType|string $mimeType): ResponseMimeType
+    {
+        if ($mimeType instanceof ResponseMimeType) {
+            return $mimeType;
+        }
+
+        return ResponseMimeType::tryFrom($mimeType)
+            ?? throw new InvalidArgumentException(sprintf('Invalid response MIME type "%s".', $mimeType));
+    }
+
+    /**
+     * Normalize a response schema option into a Schema object.
+     *
+     * @param Schema|array<array-key, mixed> $schema
+     *
+     * @throws InvalidArgumentException
+     */
+    private function resolveResponseSchema(Schema|array $schema): Schema
+    {
+        return $schema instanceof Schema ? $schema : $this->convertSchemaArray($schema);
+    }
+
+    /**
+     * Convert a Gemini REST-style schema array into a Schema object.
+     *
+     * @param array<array-key, mixed> $schema
+     *
+     * @throws InvalidArgumentException on a missing or unknown "type"
+     * @throws \Webmozart\Assert\InvalidArgumentException when any other schema field has an unexpected type
+     */
+    private function convertSchemaArray(array $schema): Schema
+    {
+        if (!isset($schema['type']) || !is_string($schema['type'])) {
+            throw new InvalidArgumentException('Response schema must define a "type" as string.');
+        }
+
+        $type = DataType::tryFrom(mb_strtoupper($schema['type']));
+        if ($type === null) {
+            throw new InvalidArgumentException(sprintf('Invalid response schema type "%s".', $schema['type']));
+        }
+
+        $description = null;
+        if (isset($schema['description'])) {
+            Assert::string($schema['description']);
+            $description = $schema['description'];
+        }
+
+        $nullable = null;
+        if (isset($schema['nullable'])) {
+            Assert::boolean($schema['nullable']);
+            $nullable = $schema['nullable'];
+        }
+
+        $enum = null;
+        if (isset($schema['enum'])) {
+            Assert::isArray($schema['enum']);
+            Assert::allString($schema['enum']);
+            $enum = array_values($schema['enum']);
+        }
+
+        $properties = null;
+        if (isset($schema['properties'])) {
+            Assert::isArray($schema['properties']);
+            $properties = [];
+            foreach ($schema['properties'] as $name => $propertySchema) {
+                Assert::string($name);
+                Assert::isArray($propertySchema);
+                $properties[$name] = $this->convertSchemaArray($propertySchema);
+            }
+        }
+
+        $required = null;
+        if (isset($schema['required'])) {
+            Assert::isArray($schema['required']);
+            Assert::allString($schema['required']);
+            $required = array_values($schema['required']);
+        }
+
+        $items = null;
+        if (isset($schema['items'])) {
+            Assert::isArray($schema['items']);
+            $items = $this->convertSchemaArray($schema['items']);
+        }
+
+        return new Schema(
+            type: $type,
+            description: $description,
+            nullable: $nullable,
+            enum: $enum,
+            properties: $properties,
+            required: $required,
+            items: $items,
+        );
     }
 }
