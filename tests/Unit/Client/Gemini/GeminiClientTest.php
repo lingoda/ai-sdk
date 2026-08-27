@@ -495,6 +495,7 @@ final class GeminiClientTest extends ClientTestCase
         $payload = 'Test message';
         $schema = [
             'type' => 'OBJECT',
+            'description' => 'Result envelope',
             'properties' => [
                 'status' => [
                     'type' => 'STRING',
@@ -502,6 +503,7 @@ final class GeminiClientTest extends ClientTestCase
                 ],
                 'tags' => [
                     'type' => 'ARRAY',
+                    'nullable' => true, // false would be dropped by Schema::toArray()'s array_filter
                     'items' => ['type' => 'STRING'],
                 ],
             ],
