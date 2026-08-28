@@ -62,13 +62,13 @@ final class OpenAIResultConverter implements ResultConverterInterface
         // Extract metadata with support for new OpenAI response format
         $metadata = [
             'id' => $response->id,
-            'object' => $response->object ?? null,
+            'object' => $response->object,
             'model' => $response->model,
             'created' => $response->created,
             'finish_reason' => $choice->finishReason,
             'usage' => $rawUsage,
             'system_fingerprint' => $response->systemFingerprint,
-            'index' => $choice->index ?? 0,
+            'index' => $choice->index,
         ];
 
         // Check if response contains tool calls

@@ -14,7 +14,8 @@ final class AnthropicUsageExtractor implements UsageExtractorInterface
      *     input_tokens?: int|null,
      *     cache_creation_input_tokens?: int|null,
      *     cache_read_input_tokens?: int|null,
-     *     output_tokens?: int|null
+     *     output_tokens?: int|null,
+     *     ...<string, mixed>
      * } $usage
      */
     public function extract(array $usage): ?Usage
