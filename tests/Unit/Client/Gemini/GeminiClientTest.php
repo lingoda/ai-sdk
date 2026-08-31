@@ -6,6 +6,7 @@ namespace Lingoda\AiSdk\Tests\Unit\Client\Gemini;
 
 use Gemini\Client as GeminiAPIClient;
 use Gemini\Data\Content;
+use Gemini\Data\DataFormat;
 use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
 use Gemini\Data\Schema;
@@ -20,7 +21,12 @@ use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\ModelInterface;
 use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\ProviderInterface;
+use Lingoda\AiSdk\Result\ObjectResult;
 use Lingoda\AiSdk\Result\ResultInterface;
+use Lingoda\AiSdk\Result\TextResult;
+use Lingoda\AiSdk\Result\ToolCall;
+use Lingoda\AiSdk\Result\ToolCallResult;
+use Lingoda\AiSdk\Result\Usage;
 use Lingoda\AiSdk\Tests\Unit\Client\ClientTestCase;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -606,17 +612,159 @@ final class GeminiClientTest extends ClientTestCase
         $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
     }
 
-    public function testBuildChatPayloadWithResponseSchemaWithoutMimeType(): void
+    public function testBuildChatPayloadWithResponseSchemaWithoutMimeTypeDefaultsToJson(): void
     {
         $payload = 'Test message';
         $options = [
             'response_schema' => ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]],
         ];
 
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(ResponseMimeType::APPLICATION_JSON, $result['generationConfig']->responseMimeType);
+        self::assertInstanceOf(Schema::class, $result['generationConfig']->responseSchema);
+    }
+
+    public function testBuildChatPayloadWithResponseSchemaAndNonJsonMimeTypeThrows(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_mime_type' => 'text/plain',
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]],
+        ];
+
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('response_schema requires response_mime_type "application/json".');
+        $this->expectExceptionMessage('A response schema requires the "application/json" response MIME type.');
 
         $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithNonArrayResponseSchemaThrows(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => json_encode(['type' => 'OBJECT', 'properties' => ['result' => ['type' => 'STRING']]]),
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Response schema must be an array or a Gemini\Data\Schema instance, got string.');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithNonStringResponseMimeTypeThrows(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_mime_type' => 123,
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Response MIME type must be a string or a Gemini\Enums\ResponseMimeType instance, got int.');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithUnsupportedResponseSchemaKeyThrows(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'additionalProperties' => false],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsupported response schema key(s) "additionalProperties".');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadWithInvalidResponseSchemaFormatThrows(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => ['type' => 'STRING', 'format' => 'uuid'],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid response schema format "uuid".');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+    }
+
+    public function testBuildChatPayloadMapsAllResponseSchemaFields(): void
+    {
+        $payload = 'Test message';
+        $options = [
+            'response_schema' => [
+                'type' => 'OBJECT',
+                'title' => 'Envelope',
+                'description' => 'Result envelope',
+                'nullable' => true,
+                'minProperties' => 1,
+                'maxProperties' => 5,
+                'propertyOrdering' => ['createdAt', 'score', 'tags', 'status'],
+                'required' => ['status'],
+                'properties' => [
+                    'createdAt' => ['type' => 'STRING', 'format' => 'date-time'],
+                    'score' => ['type' => 'NUMBER', 'minimum' => 1.5, 'maximum' => 9.5, 'example' => 4.2, 'default' => 2.5],
+                    'tags' => [
+                        'type' => 'ARRAY',
+                        'minItems' => 1,
+                        'maxItems' => '5',
+                        'items' => ['type' => 'STRING', 'minLength' => 2, 'maxLength' => 10, 'pattern' => '^[a-z]+$'],
+                    ],
+                    'status' => [
+                        'type' => 'STRING',
+                        'enum' => ['ok', 'error'],
+                    ],
+                    'value' => [
+                        'type' => 'STRING',
+                        'anyOf' => [
+                            ['type' => 'STRING'],
+                            ['type' => 'INTEGER'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        $schema = $result['generationConfig']->responseSchema;
+        self::assertInstanceOf(Schema::class, $schema);
+
+        self::assertSame(DataType::OBJECT, $schema->type);
+        self::assertSame('Envelope', $schema->title);
+        self::assertSame('Result envelope', $schema->description);
+        self::assertTrue($schema->nullable);
+        self::assertSame('1', $schema->minProperties);
+        self::assertSame('5', $schema->maxProperties);
+        self::assertSame(['createdAt', 'score', 'tags', 'status'], $schema->propertyOrdering);
+        self::assertSame(['status'], $schema->required);
+
+        self::assertSame(DataFormat::DATETIME, $schema->properties['createdAt']->format);
+
+        $score = $schema->properties['score'];
+        self::assertSame(1.5, $score->minimum);
+        self::assertSame(9.5, $score->maximum);
+        self::assertSame(4.2, $score->example);
+        self::assertSame(2.5, $score->default);
+
+        $tags = $schema->properties['tags'];
+        self::assertSame('1', $tags->minItems);
+        self::assertSame('5', $tags->maxItems);
+        self::assertSame('2', $tags->items->minLength);
+        self::assertSame('10', $tags->items->maxLength);
+        self::assertSame('^[a-z]+$', $tags->items->pattern);
+
+        self::assertSame(['ok', 'error'], $schema->properties['status']->enum);
+
+        $anyOf = $schema->properties['value']->anyOf;
+        self::assertCount(2, $anyOf);
+        self::assertSame(DataType::STRING, $anyOf[0]->type);
+        self::assertSame(DataType::INTEGER, $anyOf[1]->type);
     }
 
     public function testBuildChatPayloadWithLowercaseResponseSchemaTypes(): void
@@ -695,10 +843,95 @@ final class GeminiClientTest extends ClientTestCase
         $property->setValue($this->client, $resultConverter);
         
         $actualResult = $this->client->request($model, $payload, $options);
-        
+
         $this->assertSame($result, $actualResult);
     }
-    
+
+    public function testRequestReturnsObjectResultWhenJsonRequested(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING']]],
+        ];
+        $usage = new Usage(promptTokens: 1, completionTokens: 2, totalTokens: 3);
+        $textResult = (new TextResult('{"status":"ok"}', ['id' => 'gemini_test']))->withUsage($usage);
+        $this->setupRequestReturning($textResult);
+
+        $actualResult = $this->client->request($model, 'Test message', $options);
+
+        self::assertInstanceOf(ObjectResult::class, $actualResult);
+        $content = $actualResult->getContent();
+        self::assertObjectHasProperty('status', $content);
+        self::assertSame('ok', $content->status);
+        self::assertSame(['id' => 'gemini_test'], $actualResult->getMetadata());
+        self::assertSame($usage, $actualResult->getUsage());
+    }
+
+    public function testRequestThrowsOnMalformedJson(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING']]],
+        ];
+        $textResult = new TextResult('{"status": truncated', ['id' => 'gemini_test']);
+        $this->setupRequestReturning($textResult);
+
+        $this->logger->expects($this->once())->method('error')->with(
+            'Gemini request failed',
+            $this->arrayHasKey('exception')
+        );
+
+        $this->expectException(ClientException::class);
+        $this->expectExceptionMessage('Gemini request failed: Syntax error');
+
+        $this->client->request($model, 'Test message', $options);
+    }
+
+    public function testRequestKeepsToolCallResultWhenJsonRequested(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING']]],
+        ];
+        $toolCallResult = new ToolCallResult(['id' => 'gemini_test'], new ToolCall('call_1', 'lookup', ['q' => 'test']));
+        $this->setupRequestReturning($toolCallResult);
+
+        $actualResult = $this->client->request($model, 'Test message', $options);
+
+        self::assertSame($toolCallResult, $actualResult);
+    }
+
+    public function testRequestKeepsTextResultForJsonArrayRoot(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
+        ];
+        $textResult = new TextResult('["a", "b"]', ['id' => 'gemini_test']);
+        $this->setupRequestReturning($textResult);
+
+        $actualResult = $this->client->request($model, 'Test message', $options);
+
+        self::assertSame($textResult, $actualResult);
+    }
+
+    /**
+     * Set up the API client and result converter mocks so request() yields the given result.
+     */
+    private function setupRequestReturning(ResultInterface $result): void
+    {
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
+
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->method('generateContent')->willReturn($response);
+
+        $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
+        $resultConverter->method('convert')->willReturn($result);
+        $this->setPrivateProperty('resultConverter', $resultConverter);
+    }
+
     public function testRequestFailure(): void
     {
         $payload = 'Test message';
