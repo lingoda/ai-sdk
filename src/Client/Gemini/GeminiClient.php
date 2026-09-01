@@ -11,6 +11,7 @@ use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
 use Gemini\Data\Schema;
 use Gemini\Enums\DataType;
+use Gemini\Enums\FinishReason;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
 use Lingoda\AiSdk\ClientInterface;
@@ -18,6 +19,7 @@ use Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Exception\ResponseDecodeException;
 use Lingoda\AiSdk\ModelInterface;
 use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\ProviderInterface;
@@ -78,12 +80,6 @@ final class GeminiClient implements ClientInterface
             $response = $generativeModel->generateContent(...$contentObjects);
 
             $result = $this->getResultConverter()->convert($model, $response);
-
-            if ($generationConfig?->responseMimeType === ResponseMimeType::APPLICATION_JSON) {
-                return $this->decodeJsonResult($result);
-            }
-
-            return $result;
         } catch (\Throwable $e) {
             $this->logger->error('Gemini request failed', [
                 'exception' => $e,
@@ -96,6 +92,12 @@ final class GeminiClient implements ClientInterface
                 previous: $e
             );
         }
+
+        if ($generationConfig?->responseMimeType === ResponseMimeType::APPLICATION_JSON) {
+            return $this->decodeJsonResult($result, $generationConfig->responseSchema?->type);
+        }
+
+        return $result;
     }
 
     public function getProvider(): ProviderInterface
@@ -337,20 +339,57 @@ final class GeminiClient implements ClientInterface
     /**
      * Decode a JSON text result into an ObjectResult.
      *
-     * Non-object roots (arrays, scalars) keep the raw text result, since ObjectResult
-     * only carries objects. Malformed JSON (e.g. a response truncated by the token
-     * limit) throws and surfaces as a ClientException from request().
+     * Object and array roots become an ObjectResult; scalar and null roots (e.g. a
+     * STRING schema) deliberately keep the raw text result, so getContent() stays
+     * typed as object|array for the structured container shapes.
      *
-     * @throws \JsonException
+     * @throws ResponseDecodeException on malformed JSON, e.g. a response truncated
+     *                                 by the token limit, or on a scalar root when
+     *                                 the schema requested a container root;
+     *                                 carries the raw result
      */
-    private function decodeJsonResult(ResultInterface $result): ResultInterface
+    private function decodeJsonResult(ResultInterface $result, ?DataType $schemaRootType = null): ResultInterface
     {
         if (!$result instanceof TextResult) {
             return $result;
         }
 
-        $decoded = json_decode($result->getContent(), false, 512, JSON_THROW_ON_ERROR);
-        if (!is_object($decoded)) {
+        try {
+            $decoded = json_decode($result->getContent(), false, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            $metadata = $result->getMetadata();
+            $finishReason = $metadata['finish_reason'] ?? null;
+            $finishReasonValue = $finishReason instanceof FinishReason ? $finishReason->value : 'unknown';
+
+            $this->logger->error('Gemini returned malformed JSON', [
+                'finish_reason' => $finishReason instanceof FinishReason ? $finishReason->value : null,
+                'prompt_feedback' => $metadata['prompt_feedback'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new ResponseDecodeException($result, sprintf(
+                'Failed to decode Gemini JSON response (finish reason: %s): %s',
+                $finishReasonValue,
+                $e->getMessage(),
+            ), $e);
+        }
+
+        if (!is_object($decoded) && !is_array($decoded)) {
+            // A container root was promised by the schema, so a scalar root is a
+            // schema violation by the model, not a requested shape
+            if ($schemaRootType === DataType::OBJECT || $schemaRootType === DataType::ARRAY) {
+                $this->logger->error('Gemini returned JSON that does not match the response schema root type', [
+                    'expected_root' => $schemaRootType->value,
+                    'actual_root' => get_debug_type($decoded),
+                ]);
+
+                throw new ResponseDecodeException($result, sprintf(
+                    'Gemini JSON response has a %s root, but the response schema requested an %s root.',
+                    get_debug_type($decoded),
+                    $schemaRootType->value,
+                ));
+            }
+
             return $result;
         }
 

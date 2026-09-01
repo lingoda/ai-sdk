@@ -196,7 +196,7 @@ $result = $platform->ask('Generate a response with tool calls');
 match (true) {
     $result instanceof TextResult => processText($result->getContent()),
     $result instanceof ToolCallResult => processToolCall($result->getToolCalls()),
-    $result instanceof ObjectResult => processObject($result->getObject()),
+    $result instanceof ObjectResult => processObject($result->getContent()),
     default => throw new \UnexpectedValueException('Unknown result type')
 };
 ```

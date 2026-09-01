@@ -11,10 +11,12 @@ use Gemini\Data\GenerationConfig;
 use Gemini\Data\Part;
 use Gemini\Data\Schema;
 use Gemini\Enums\DataType;
+use Gemini\Enums\FinishReason;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ClientException;
+use Lingoda\AiSdk\Exception\ResponseDecodeException;
 use Lingoda\AiSdk\Client\Gemini\GeminiClient;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Enum\AIProvider;
@@ -861,7 +863,7 @@ final class GeminiClientTest extends ClientTestCase
 
         self::assertInstanceOf(ObjectResult::class, $actualResult);
         $content = $actualResult->getContent();
-        self::assertObjectHasProperty('status', $content);
+        self::assertInstanceOf(\stdClass::class, $content);
         self::assertSame('ok', $content->status);
         self::assertSame(['id' => 'gemini_test'], $actualResult->getMetadata());
         self::assertSame($usage, $actualResult->getUsage());
@@ -873,18 +875,27 @@ final class GeminiClientTest extends ClientTestCase
         $options = [
             'response_schema' => ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING']]],
         ];
-        $textResult = new TextResult('{"status": truncated', ['id' => 'gemini_test']);
+        $textResult = new TextResult('{"status": truncated', [
+            'id' => 'gemini_test',
+            'finish_reason' => FinishReason::MAX_TOKENS,
+        ]);
         $this->setupRequestReturning($textResult);
 
         $this->logger->expects($this->once())->method('error')->with(
-            'Gemini request failed',
-            $this->arrayHasKey('exception')
+            'Gemini returned malformed JSON',
+            $this->callback(
+                static fn (array $context): bool => $context['finish_reason'] === 'MAX_TOKENS' && isset($context['error'])
+            )
         );
 
-        $this->expectException(ClientException::class);
-        $this->expectExceptionMessage('Gemini request failed: Syntax error');
-
-        $this->client->request($model, 'Test message', $options);
+        try {
+            $this->client->request($model, 'Test message', $options);
+            self::fail('Expected ' . ResponseDecodeException::class . ' to be thrown.');
+        } catch (ResponseDecodeException $e) {
+            self::assertStringContainsString('Failed to decode Gemini JSON response (finish reason: MAX_TOKENS)', $e->getMessage());
+            self::assertSame($textResult, $e->getResult());
+            self::assertInstanceOf(\JsonException::class, $e->getPrevious());
+        }
     }
 
     public function testRequestKeepsToolCallResultWhenJsonRequested(): void
@@ -901,13 +912,54 @@ final class GeminiClientTest extends ClientTestCase
         self::assertSame($toolCallResult, $actualResult);
     }
 
-    public function testRequestKeepsTextResultForJsonArrayRoot(): void
+    public function testRequestReturnsObjectResultForJsonArrayRoot(): void
     {
         $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
         $options = [
             'response_schema' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
         ];
-        $textResult = new TextResult('["a", "b"]', ['id' => 'gemini_test']);
+        $usage = new Usage(promptTokens: 1, completionTokens: 2, totalTokens: 3);
+        $textResult = (new TextResult('["a", "b"]', ['id' => 'gemini_test']))->withUsage($usage);
+        $this->setupRequestReturning($textResult);
+
+        $actualResult = $this->client->request($model, 'Test message', $options);
+
+        self::assertInstanceOf(ObjectResult::class, $actualResult);
+        self::assertSame(['a', 'b'], $actualResult->getContent());
+        self::assertSame(['id' => 'gemini_test'], $actualResult->getMetadata());
+        self::assertSame($usage, $actualResult->getUsage());
+    }
+
+    public function testRequestThrowsWhenScalarRootViolatesContainerSchema(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING']]],
+        ];
+        $textResult = new TextResult('"ok"', ['id' => 'gemini_test']);
+        $this->setupRequestReturning($textResult);
+
+        $this->logger->expects($this->once())->method('error')->with(
+            'Gemini returned JSON that does not match the response schema root type',
+            ['expected_root' => 'OBJECT', 'actual_root' => 'string']
+        );
+
+        try {
+            $this->client->request($model, 'Test message', $options);
+            self::fail('Expected ' . ResponseDecodeException::class . ' to be thrown.');
+        } catch (ResponseDecodeException $e) {
+            self::assertSame('Gemini JSON response has a string root, but the response schema requested an OBJECT root.', $e->getMessage());
+            self::assertSame($textResult, $e->getResult());
+        }
+    }
+
+    public function testRequestKeepsTextResultForJsonScalarRoot(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $options = [
+            'response_schema' => ['type' => 'STRING', 'enum' => ['ok', 'error']],
+        ];
+        $textResult = new TextResult('"ok"', ['id' => 'gemini_test']);
         $this->setupRequestReturning($textResult);
 
         $actualResult = $this->client->request($model, 'Test message', $options);
