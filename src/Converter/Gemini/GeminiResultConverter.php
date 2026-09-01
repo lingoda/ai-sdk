@@ -68,9 +68,9 @@ final class GeminiResultConverter implements ResultConverterInterface
         }
 
         $rawUsage = [
-            'prompt_token_count' => $response->usageMetadata->promptTokenCount ?? 0,
+            'prompt_token_count' => $response->usageMetadata->promptTokenCount,
             'candidates_token_count' => $response->usageMetadata->candidatesTokenCount ?? 0,
-            'total_token_count' => $response->usageMetadata->totalTokenCount ?? 0,
+            'total_token_count' => $response->usageMetadata->totalTokenCount,
             'cached_content_token_count' => $response->usageMetadata->cachedContentTokenCount ?? 0,
             'tool_use_prompt_token_count' => $response->usageMetadata->toolUsePromptTokenCount ?? 0,
             'thoughts_token_count' => $response->usageMetadata->thoughtsTokenCount ?? 0,
@@ -85,10 +85,10 @@ final class GeminiResultConverter implements ResultConverterInterface
             'role' => $candidate->content->role,
             'index' => $candidate->index ?? 0,
             'usage' => $rawUsage,
-            'safety_ratings' => $candidate->safetyRatings ?? [],
-            'prompt_feedback' => $response->promptFeedback ?? null,
-            'citation_metadata' => $candidate->citationMetadata ?? null,
-            'token_count' => $candidate->tokenCount ?? null,
+            'safety_ratings' => $candidate->safetyRatings,
+            'prompt_feedback' => $response->promptFeedback,
+            'citation_metadata' => $candidate->citationMetadata,
+            'token_count' => $candidate->tokenCount,
         ];
 
         // Return tool calls if any exist, otherwise return text result

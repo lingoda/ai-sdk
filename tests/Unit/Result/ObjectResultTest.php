@@ -102,10 +102,11 @@ final class ObjectResultTest extends ResultTestCase
 
         $result = new ObjectResult($content);
 
-        $this->assertEquals(123, $result->getContent()->user->id);
-        $this->assertEquals('user@example.com', $result->getContent()->user->profile->email);
-        $this->assertEquals('dark', $result->getContent()->settings['theme']);
-        $this->assertEquals('en', $result->getContent()->settings['preferences']['language']);
+        $this->assertSame($content, $result->getContent());
+        $this->assertEquals(123, $content->user->id);
+        $this->assertEquals('user@example.com', $content->user->profile->email);
+        $this->assertEquals('dark', $content->settings['theme']);
+        $this->assertEquals('en', $content->settings['preferences']['language']);
     }
 
     /**
@@ -132,5 +133,89 @@ final class ObjectResultTest extends ResultTestCase
 
         $this->assertSame($content, $result->getContent());
         $this->assertEquals([], get_object_vars($result->getContent()));
+    }
+
+    /**
+     * Test with a list array, e.g. a decoded JSON response with an array root.
+     */
+    public function testWithListArray(): void
+    {
+        $content = ['a', 'b', 'c'];
+        $result = new ObjectResult($content);
+
+        $this->assertSame($content, $result->getContent());
+    }
+
+    /**
+     * Test with an associative array.
+     */
+    public function testWithAssociativeArray(): void
+    {
+        $content = ['name' => 'John Doe', 'age' => 30];
+        $result = new ObjectResult($content);
+
+        $this->assertSame($content, $result->getContent());
+    }
+
+    /**
+     * Test toArray with an object root.
+     */
+    public function testToArrayWithObjectRoot(): void
+    {
+        $content = new stdClass();
+        $content->name = 'John Doe';
+        $content->age = 30;
+
+        $result = new ObjectResult($content);
+
+        $this->assertSame(['name' => 'John Doe', 'age' => 30], $result->toArray());
+    }
+
+    /**
+     * Test toArray with a list root.
+     */
+    public function testToArrayWithListRoot(): void
+    {
+        $result = new ObjectResult(['a', 'b', 'c']);
+
+        $this->assertSame(['a', 'b', 'c'], $result->toArray());
+    }
+
+    /**
+     * Test toArray converts nested objects recursively.
+     */
+    public function testToArrayConvertsNestedObjectsRecursively(): void
+    {
+        $profile = new stdClass();
+        $profile->email = 'user@example.com';
+        $user = new stdClass();
+        $user->id = 123;
+        $user->profile = $profile;
+        $content = new stdClass();
+        $content->user = $user;
+        $content->tags = ['a', 'b'];
+
+        $result = new ObjectResult($content);
+
+        $this->assertSame([
+            'user' => [
+                'id' => 123,
+                'profile' => ['email' => 'user@example.com'],
+            ],
+            'tags' => ['a', 'b'],
+        ], $result->toArray());
+    }
+
+    /**
+     * Test toArray with an array root containing nested objects.
+     */
+    public function testToArrayWithNestedObjectsInsideListRoot(): void
+    {
+        $item = new stdClass();
+        $item->id = 1;
+
+        $result = new ObjectResult([$item]);
+
+        $this->assertSame([['id' => 1]], $result->toArray());
     }
 }

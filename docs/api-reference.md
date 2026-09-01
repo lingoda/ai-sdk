@@ -304,13 +304,18 @@ if ($result instanceof ToolCallResult) {
 
 ### ObjectResult
 
-Structured object responses:
+Structured responses decoded from JSON, holding either an object or an array root.
+A response schema with an object or array root always yields an `ObjectResult` (or a
+`ResponseDecodeException` when the response cannot be decoded into that shape); scalar
+roots — a scalar schema, or a bare scalar in schema-less JSON mode — keep the raw JSON
+as a `TextResult`:
 
 ```php
 use Lingoda\AiSdk\Result\ObjectResult;
 
 if ($result instanceof ObjectResult) {
-    $object = $result->getObject();        // object
+    $data = $result->getContent();         // object|array
+    $array = $result->toArray();           // array, nested objects converted recursively
     $metadata = $result->getMetadata();    // array
 }
 ```
@@ -628,6 +633,7 @@ public function hasProvider(string $name): bool
 - `ModelNotFoundException` - Requested model not available
 - `RateLimitExceededException` - Rate limiting errors (extends RuntimeException)
 - `UnsupportedCapabilityException` - Model lacks required capability (extends InvalidArgumentException)
+- `ResponseDecodeException` - Response received but not decodable into the requested structured format (extends ClientException); `getResult()` returns the raw result with metadata and usage
 
 ```php
 use Lingoda\AiSdk\Exception\ModelNotFoundException;

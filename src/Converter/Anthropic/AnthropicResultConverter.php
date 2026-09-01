@@ -46,11 +46,11 @@ final class AnthropicResultConverter implements ResultConverterInterface
         // Extract metadata with support for current Anthropic response format
         $metadata = [
             'id' => $responseArray['id'] ?? '',
-            'type' => $responseArray['type'] ?? null,
+            'type' => $responseArray['type'],
             'model' => $responseArray['model'] ?? $model->getId(),
-            'role' => $responseArray['role'] ?? null,
-            'stop_reason' => $responseArray['stop_reason'] ?? null,
-            'stop_sequence' => $responseArray['stop_sequence'] ?? null,
+            'role' => $responseArray['role'],
+            'stop_reason' => $responseArray['stop_reason'],
+            'stop_sequence' => $responseArray['stop_sequence'],
             'usage' => $rawUsage,
         ];
 

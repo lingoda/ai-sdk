@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk\Tests\Unit\Converter\Gemini;
 
 use Gemini\Data\Candidate;
+use Gemini\Data\CitationMetadata;
 use Gemini\Data\Content;
 use Gemini\Data\UsageMetadata;
 use Gemini\Enums\FinishReason;
@@ -130,6 +131,7 @@ final class GeminiResultConverterTest extends TestCase
     {
         $response = $this->createMock(GenerateContentResponse::class);
         $response->modelVersion = 'gemini-pro';
+        $response->promptFeedback = null;
         $response->usageMetadata = new UsageMetadata(
             promptTokenCount: 10,
             candidatesTokenCount: 5,
@@ -139,6 +141,9 @@ final class GeminiResultConverterTest extends TestCase
         $candidate = $this->createMock(Candidate::class);
         $candidate->finishReason = FinishReason::STOP;
         $candidate->index = 0;
+        $candidate->safetyRatings = [];
+        $candidate->citationMetadata = new CitationMetadata();
+        $candidate->tokenCount = null;
 
         $content = $this->createMock(Content::class);
         $content->role = Role::MODEL;
@@ -156,6 +161,7 @@ final class GeminiResultConverterTest extends TestCase
     {
         $response = $this->createMock(GenerateContentResponse::class);
         $response->modelVersion = 'gemini-pro';
+        $response->promptFeedback = null;
         $response->usageMetadata = new UsageMetadata(
             promptTokenCount: 15,
             candidatesTokenCount: 8,
@@ -165,6 +171,9 @@ final class GeminiResultConverterTest extends TestCase
         $candidate = $this->createMock(Candidate::class);
         $candidate->finishReason = FinishReason::STOP;
         $candidate->index = 0;
+        $candidate->safetyRatings = [];
+        $candidate->citationMetadata = new CitationMetadata();
+        $candidate->tokenCount = null;
 
         $content = $this->createMock(Content::class);
         $content->role = Role::MODEL;

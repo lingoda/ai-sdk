@@ -146,6 +146,7 @@ final class AnthropicResultConverterTest extends TestCase
             'model' => 'claude-3-opus-20240229',
             'role' => 'assistant',
             'stop_reason' => 'end_turn',
+            'stop_sequence' => null,
             'content' => [
                 ['type' => 'text', 'text' => $text]
             ],
@@ -163,6 +164,11 @@ final class AnthropicResultConverterTest extends TestCase
         $response = $this->createMock(CreateResponse::class);
         $response->method('toArray')->willReturn([
             'id' => 'msg_01XYZ789',
+            'type' => 'message',
+            'model' => 'claude-3-opus-20240229',
+            'role' => 'assistant',
+            'stop_reason' => 'tool_use',
+            'stop_sequence' => null,
             'content' => [
                 [
                     'type' => 'tool_use',
@@ -181,6 +187,11 @@ final class AnthropicResultConverterTest extends TestCase
         $response = $this->createMock(CreateResponse::class);
         $response->method('toArray')->willReturn([
             'id' => 'msg_mixed',
+            'type' => 'message',
+            'model' => 'claude-3-opus-20240229',
+            'role' => 'assistant',
+            'stop_reason' => 'tool_use',
+            'stop_sequence' => null,
             'content' => [
                 ['type' => 'text', 'text' => 'I\'ll check the weather for you.'],
                 [
@@ -201,6 +212,11 @@ final class AnthropicResultConverterTest extends TestCase
         $response = $this->createMock(CreateResponse::class);
         $response->method('toArray')->willReturn([
             'id' => 'msg_empty',
+            'type' => 'message',
+            'model' => 'claude-3-opus-20240229',
+            'role' => 'assistant',
+            'stop_reason' => 'end_turn',
+            'stop_sequence' => null,
             'content' => []
         ]);
 

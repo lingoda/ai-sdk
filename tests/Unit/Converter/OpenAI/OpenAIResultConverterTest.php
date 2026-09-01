@@ -126,12 +126,14 @@ final class OpenAIResultConverterTest extends TestCase
     {
         $response = $this->createMock(CreateResponse::class);
         $response->id = 'chat-123';
+        $response->object = 'chat.completion';
         $response->model = 'gpt-4';
         $response->created = 1234567890;
         $response->systemFingerprint = 'fp_test';
 
         $choice = $this->createMock(CreateResponseChoice::class);
         $choice->finishReason = 'stop';
+        $choice->index = 0;
 
         $message = $this->createMock(CreateResponseMessage::class);
         $message->content = $content;
@@ -168,12 +170,14 @@ final class OpenAIResultConverterTest extends TestCase
     {
         $response = $this->createMock(CreateResponse::class);
         $response->id = 'chat-123';
+        $response->object = 'chat.completion';
         $response->model = 'gpt-4';
         $response->created = 1234567890;
         $response->systemFingerprint = 'fp_test';
 
         $choice = $this->createMock(CreateResponseChoice::class);
         $choice->finishReason = 'tool_calls';
+        $choice->index = 0;
 
         $message = $this->createMock(CreateResponseMessage::class);
         $message->content = null;
