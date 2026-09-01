@@ -315,6 +315,7 @@ use Lingoda\AiSdk\Result\ObjectResult;
 
 if ($result instanceof ObjectResult) {
     $data = $result->getContent();         // object|array
+    $array = $result->toArray();           // array, nested objects converted recursively
     $metadata = $result->getMetadata();    // array
 }
 ```
