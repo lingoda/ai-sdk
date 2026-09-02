@@ -122,7 +122,10 @@ try {
 
 ### Google Gemini Models
 
-#### Gemini 2.5 Series (Current)
+#### Gemini 3.1 Series
+- `gemini-3.1-flash-lite` - Low-latency, cost-effective lightweight tasks
+
+#### Gemini 2.5 Series
 - `gemini-2.5-pro` - Advanced reasoning and complex tasks
 - `gemini-2.5-flash` - Fast responses and efficient processing
 
