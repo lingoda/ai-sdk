@@ -31,6 +31,7 @@ final class GeminiProviderTest extends ProviderTestCase
         return [
             'gemini-2.5-pro',
             'gemini-2.5-flash',
+            'gemini-3.1-flash-lite',
         ];
     }
     
@@ -51,7 +52,13 @@ final class GeminiProviderTest extends ProviderTestCase
     public function testGetModelReturnsConfigurableModel(): void
     {
         $model = $this->provider->getModel('gemini-2.5-flash');
-        
+
         $this->assertInstanceOf(ConfigurableModel::class, $model);
+    }
+
+    public function testGemini31FlashLiteIsAvailable(): void
+    {
+        $this->assertTrue($this->provider->hasModel('gemini-3.1-flash-lite'));
+        $this->assertContains('gemini-3.1-flash-lite', $this->provider->getAvailableModels());
     }
 }

@@ -14,18 +14,22 @@ final class ChatModelTest extends TestCase
     {
         $this->assertEquals('gemini-2.5-pro', ChatModel::GEMINI_2_5_PRO->value);
         $this->assertEquals('gemini-2.5-flash', ChatModel::GEMINI_2_5_FLASH->value);
+        $this->assertEquals('gemini-3.1-flash-lite', ChatModel::GEMINI_3_1_FLASH_LITE->value);
+        $this->assertSame(ChatModel::GEMINI_3_1_FLASH_LITE, ChatModel::from('gemini-3.1-flash-lite'));
     }
 
     public function testGetId(): void
     {
         $this->assertEquals('gemini-2.5-pro', ChatModel::GEMINI_2_5_PRO->getId());
         $this->assertEquals('gemini-2.5-flash', ChatModel::GEMINI_2_5_FLASH->getId());
+        $this->assertEquals('gemini-3.1-flash-lite', ChatModel::GEMINI_3_1_FLASH_LITE->getId());
     }
 
     public function testGetMaxTokens(): void
     {
         $this->assertEquals(1000000, ChatModel::GEMINI_2_5_PRO->getMaxTokens());
         $this->assertEquals(1000000, ChatModel::GEMINI_2_5_FLASH->getMaxTokens());
+        $this->assertEquals(1000000, ChatModel::GEMINI_3_1_FLASH_LITE->getMaxTokens());
     }
 
     public function testGetCapabilities(): void
@@ -39,6 +43,7 @@ final class ChatModelTest extends TestCase
 
         $this->assertEquals($expectedCapabilities, ChatModel::GEMINI_2_5_PRO->getCapabilities());
         $this->assertEquals($expectedCapabilities, ChatModel::GEMINI_2_5_FLASH->getCapabilities());
+        $this->assertEquals($expectedCapabilities, ChatModel::GEMINI_3_1_FLASH_LITE->getCapabilities());
     }
 
     public function testHasCapability(): void
@@ -46,6 +51,7 @@ final class ChatModelTest extends TestCase
         $models = [
             ChatModel::GEMINI_2_5_PRO,
             ChatModel::GEMINI_2_5_FLASH,
+            ChatModel::GEMINI_3_1_FLASH_LITE,
         ];
 
         foreach ($models as $model) {
@@ -67,12 +73,22 @@ final class ChatModelTest extends TestCase
 
         $this->assertEquals($expectedOptions, ChatModel::GEMINI_2_5_PRO->getOptions());
         $this->assertEquals($expectedOptions, ChatModel::GEMINI_2_5_FLASH->getOptions());
+
+        $expectedFlashLiteOptions = [
+            'temperature' => 0.7,
+            'maxOutputTokens' => 65536,
+            'topP' => 0.95,
+            'topK' => 40,
+        ];
+
+        $this->assertEquals($expectedFlashLiteOptions, ChatModel::GEMINI_3_1_FLASH_LITE->getOptions());
     }
 
     public function testGetDisplayName(): void
     {
         $this->assertEquals('Gemini 2.5 Pro', ChatModel::GEMINI_2_5_PRO->getDisplayName());
         $this->assertEquals('Gemini 2.5 Flash', ChatModel::GEMINI_2_5_FLASH->getDisplayName());
+        $this->assertEquals('Gemini 3.1 Flash Lite', ChatModel::GEMINI_3_1_FLASH_LITE->getDisplayName());
     }
 
     public function testImplementsModelConfigurationInterface(): void
@@ -90,11 +106,12 @@ final class ChatModelTest extends TestCase
     public function testAllEnumCases(): void
     {
         $cases = ChatModel::cases();
-        $this->assertCount(2, $cases);
+        $this->assertCount(3, $cases);
 
         $expectedCases = [
             ChatModel::GEMINI_2_5_PRO,
             ChatModel::GEMINI_2_5_FLASH,
+            ChatModel::GEMINI_3_1_FLASH_LITE,
         ];
 
         $this->assertEquals($expectedCases, $cases);

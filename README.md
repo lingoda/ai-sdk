@@ -160,6 +160,7 @@ composer require lingoda/ai-sdk
 - Claude 3.5: `claude-3-5-haiku`
 
 **Google Gemini Models:**
+- Gemini 3.1: `gemini-3.1-flash-lite` (1M context)
 - Gemini 2.5: `gemini-2.5-pro`, `gemini-2.5-flash` (1M context)
 
 ## 🚦 Quick Test

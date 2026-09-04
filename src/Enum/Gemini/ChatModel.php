@@ -11,6 +11,7 @@ enum ChatModel: string implements ModelConfigurationInterface
 {
     case GEMINI_2_5_PRO = 'gemini-2.5-pro';
     case GEMINI_2_5_FLASH = 'gemini-2.5-flash';
+    case GEMINI_3_1_FLASH_LITE = 'gemini-3.1-flash-lite';
 
     public function getId(): string
     {
@@ -21,7 +22,8 @@ enum ChatModel: string implements ModelConfigurationInterface
     {
         return match ($this) {
             self::GEMINI_2_5_PRO,
-            self::GEMINI_2_5_FLASH => 1000000,
+            self::GEMINI_2_5_FLASH,
+            self::GEMINI_3_1_FLASH_LITE => 1000000,
         };
     }
 
@@ -33,9 +35,10 @@ enum ChatModel: string implements ModelConfigurationInterface
     public function getCapabilities(): array
     {
         return match ($this) {
-            // All Gemini 2.5 models support text, tools, vision, and multimodal
+            // All Gemini models support text, tools, vision, and multimodal
             self::GEMINI_2_5_PRO,
-            self::GEMINI_2_5_FLASH => [
+            self::GEMINI_2_5_FLASH,
+            self::GEMINI_3_1_FLASH_LITE => [
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
@@ -67,6 +70,14 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'topP' => 0.95,
                 'topK' => 40,
             ],
+            // Documented output limit is 65,536 tokens (input context is 1M)
+            // https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite
+            self::GEMINI_3_1_FLASH_LITE => [
+                'temperature' => 0.7,
+                'maxOutputTokens' => 65536,
+                'topP' => 0.95,
+                'topK' => 40,
+            ],
         };
     }
 
@@ -78,6 +89,7 @@ enum ChatModel: string implements ModelConfigurationInterface
         return match ($this) {
             self::GEMINI_2_5_PRO => 'Gemini 2.5 Pro',
             self::GEMINI_2_5_FLASH => 'Gemini 2.5 Flash',
+            self::GEMINI_3_1_FLASH_LITE => 'Gemini 3.1 Flash Lite',
         };
     }
 
