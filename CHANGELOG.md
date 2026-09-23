@@ -1,6 +1,11 @@
 # Changelog
 
-## 2.0.0 (unreleased)
+## 2.0.1 (unreleased)
+
+### Fixed
+- `ExternalRateLimiterInterface::getRateLimiter()` documented `@return RateLimiterFactory` while its signature returns `RateLimiterFactoryInterface`; implementations can now return any `RateLimiterFactoryInterface` without static analysis narrowing them to the concrete class.
+
+## 2.0.0 (2026-09-23)
 
 ### Added
 - Attachments: `Attachment` value object (PDF, DOCX, text formats TXT/CSV/Markdown/HTML/JSON, JPEG, PNG, GIF, WebP; 15 MB guard), `UserPrompt::withAttachments()`, `Conversation::withAttachments()`. Text formats are sent as text, so every model reads them; DOCX is read by Bedrock Nova only.
