@@ -42,6 +42,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
+                Capability::DOCUMENT,
                 Capability::MULTIMODAL,
             ],
         };

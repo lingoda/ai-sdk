@@ -6,6 +6,7 @@ namespace Lingoda\AiSdk\Client\OpenAI;
 
 use Lingoda\AiSdk\Audio\AudioCapableInterface;
 use Lingoda\AiSdk\Audio\AudioOptionsInterface;
+use Lingoda\AiSdk\Client\AttachmentBlocksTrait;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\OpenAI\OpenAIResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
@@ -13,6 +14,7 @@ use Lingoda\AiSdk\Enum\OpenAI\AudioSpeechFormat;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Provider\OpenAIProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\BinaryResult;
@@ -26,9 +28,11 @@ use Psr\Log\NullLogger;
 
 final class OpenAIClient implements ClientInterface, AudioCapableInterface
 {
+    use AttachmentBlocksTrait;
+
     private ?OpenAIResultConverter $resultConverter = null;
     private ?OpenAIProvider $provider = null;
-    
+
     public function __construct(
         private readonly OpenAIAPIClient $client,
         private readonly LoggerInterface $logger = new NullLogger(),
@@ -42,12 +46,29 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
 
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface
     {
+        $hasAttachments = $this->hasAttachments($payload);
+        $modelId = $model->getId();
+        $expanded = $this->expandAttachments($payload, fn (Attachment $attachment, int $position): array => match (true) {
+            $attachment->isImage() => ['type' => 'image_url', 'image_url' => ['url' => sprintf('data:%s;base64,%s', $attachment->mimeType, base64_encode($attachment->bytes()))]],
+            $attachment->isText() => ['type' => 'text', 'text' => $this->attachmentText($attachment, $position)],
+            // Chat Completions takes PDF files only, with a filename: a generated one, never the user's
+            $attachment->mimeType === Attachment::PDF => ['type' => 'file', 'file' => [
+                'filename' => sprintf('document-%d.pdf', $position),
+                'file_data' => 'data:application/pdf;base64,' . base64_encode($attachment->bytes()),
+            ]],
+            default => throw $this->unsupportedAttachment('OpenAI', $modelId, $attachment),
+        });
+
         try {
-            $requestPayload = $this->buildChatPayload($model, $payload, $options);
+            $requestPayload = $this->buildChatPayload($model, $expanded, $options);
             $response = $this->client->chat()->create($requestPayload);
-            
+
             return $this->getResultConverter()->convert($model, $response);
         } catch (\Throwable $e) {
+            if ($hasAttachments) {
+                throw $this->attachmentFailure($this->logger, 'OpenAI', $model->getId(), $e::class, $e->getMessage());
+            }
+
             $this->logger->error('OpenAI chat request failed', [
                 'exception' => $e,
                 'model' => $model->getId(),
@@ -71,12 +92,12 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         try {
             $payload = array_merge($options->toArray(), ['input' => $input]);
             $response = $this->client->audio()->speech($payload);
-            
+
             $responseFormat = $payload['response_format'] ?? AudioSpeechFormat::MP3->value;
             $format = is_string($responseFormat) ?
                 (AudioSpeechFormat::tryFrom($responseFormat) ?? AudioSpeechFormat::MP3) :
                 AudioSpeechFormat::MP3;
-            
+
             return new BinaryResult($response, $format->getMimeType());
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI text-to-speech request failed', [
@@ -106,7 +127,6 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             // The OpenAI response implements an iterator, we need to get the underlying stream
             $reflection = new \ReflectionClass($streamResponse);
             $property = $reflection->getProperty('response');
-            $property->setAccessible(true);
             /** @var \Psr\Http\Message\ResponseInterface $response */
             $response = $property->getValue($streamResponse);
 
@@ -129,7 +149,7 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         try {
             $payload = array_merge($options->toArray(), ['file' => $audioStream]);
             $response = $this->client->audio()->transcribe($payload);
-            
+
             return new TextResult($response->text);
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI speech-to-text request failed', [
@@ -148,7 +168,7 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         try {
             $payload = array_merge($options->toArray(), ['file' => $audioStream]);
             $response = $this->client->audio()->translate($payload);
-            
+
             return new TextResult($response->text);
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI speech translation request failed', [
@@ -230,6 +250,12 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         // Set default max_tokens if not specified
         if (!isset($requestPayload['max_tokens'])) {
             $requestPayload['max_tokens'] = min(4096, $model->getMaxTokens());
+        }
+
+        // GPT-5 models reject max_tokens and take max_completion_tokens instead
+        if (str_starts_with($model->getId(), 'gpt-5')) {
+            $requestPayload['max_completion_tokens'] ??= $requestPayload['max_tokens'];
+            unset($requestPayload['max_tokens']);
         }
 
         return $requestPayload;

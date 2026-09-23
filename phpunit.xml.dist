@@ -13,6 +13,8 @@
     <php>
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
+        <!-- Trace-redaction tests need call arguments in traces; CI's production php.ini turns them off -->
+        <ini name="zend.exception_ignore_args" value="0" />
         <server name="SHELL_VERBOSITY" value="-1" />
     </php>
 

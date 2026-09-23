@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Provider;
 
@@ -15,17 +15,17 @@ final class GeminiProviderTest extends ProviderTestCase
     {
         return new GeminiProvider();
     }
-    
+
     protected function getExpectedId(): string
     {
         return 'gemini';
     }
-    
+
     protected function getExpectedName(): string
     {
         return 'Google Gemini';
     }
-    
+
     protected function getExpectedModelIds(): array
     {
         return [
@@ -34,7 +34,7 @@ final class GeminiProviderTest extends ProviderTestCase
             'gemini-3.1-flash-lite',
         ];
     }
-    
+
     protected function getProviderEnum(): AIProvider
     {
         return AIProvider::GEMINI;
@@ -43,7 +43,7 @@ final class GeminiProviderTest extends ProviderTestCase
     public function testGetModelsReturnsConfigurableModelInstances(): void
     {
         $models = $this->provider->getModels();
-        
+
         foreach ($models as $model) {
             $this->assertInstanceOf(ConfigurableModel::class, $model);
         }
@@ -60,5 +60,12 @@ final class GeminiProviderTest extends ProviderTestCase
     {
         $this->assertTrue($this->provider->hasModel('gemini-3.1-flash-lite'));
         $this->assertContains('gemini-3.1-flash-lite', $this->provider->getAvailableModels());
+    }
+
+    public function testConstructorSetsTheDefaultModel(): void
+    {
+        $modelId = (new GeminiProvider())->getAvailableModels()[1];
+
+        $this->assertSame($modelId, (new GeminiProvider($modelId))->getDefaultModel());
     }
 }

@@ -222,4 +222,22 @@ final class AnthropicResultConverterTest extends TestCase
 
         return $response;
     }
+
+    public function testSkipsContentBlocksThatAreNotArrays(): void
+    {
+        $response = $this->createMock(CreateResponse::class);
+        $response->method('toArray')->willReturn([
+            'id' => 'msg_mixed',
+            'type' => 'message',
+            'model' => 'claude-3-opus-20240229',
+            'role' => 'assistant',
+            'stop_reason' => 'end_turn',
+            'stop_sequence' => null,
+            'content' => ['not a block', ['type' => 'text', 'text' => 'Hello']],
+        ]);
+
+        $result = $this->converter->convert($this->createMockModel(AIProvider::ANTHROPIC), $response);
+
+        $this->assertSame('Hello', $result->getContent());
+    }
 }

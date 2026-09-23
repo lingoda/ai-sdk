@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\RateLimit;
 
+use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\RateLimitExceededException;
 use Lingoda\AiSdk\ModelInterface;
 use Psr\Log\LoggerInterface;
@@ -11,12 +12,13 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class SymfonyRateLimiter implements RateLimiterInterface
 {
     /**
-     * @var array<string, array{requests: ?RateLimiterFactory, tokens: ?RateLimiterFactory}>
+     * @var array<string, array{requests: RateLimiterFactoryInterface, tokens: RateLimiterFactoryInterface}>
      */
     private array $limiters = [];
 
@@ -30,36 +32,24 @@ final class SymfonyRateLimiter implements RateLimiterInterface
     public function consume(ModelInterface $model, int $estimatedTokens = 1): void
     {
         $limiters = $this->getLimitersForModel($model);
-        
+
         try {
-            // Check request rate limit if available
-            if ($limiters['requests'] !== null) {
-                $requestLimiter = $limiters['requests']->create($this->getRequestKey($model));
-                $requestLimit = $requestLimiter->consume();
-                
-                if (!$requestLimit->isAccepted()) {
-                    $retryAfter = $requestLimit->getRetryAfter()->getTimestamp() - time();
-                    throw new RateLimitExceededException($retryAfter, 'Request rate limit exceeded');
-                }
+            $requestLimit = $limiters['requests']->create($this->getRequestKey($model))->consume();
+            if (!$requestLimit->isAccepted()) {
+                $retryAfter = $requestLimit->getRetryAfter()->getTimestamp() - time();
+                throw new RateLimitExceededException($retryAfter, 'Request rate limit exceeded');
             }
 
-            // Check token rate limit if available
-            if ($limiters['tokens'] !== null) {
-                $tokenLimiter = $limiters['tokens']->create($this->getTokenKey($model));
-                $tokenLimit = $tokenLimiter->consume($estimatedTokens);
-                
-                if (!$tokenLimit->isAccepted()) {
-                    $retryAfter = $tokenLimit->getRetryAfter()->getTimestamp() - time();
-                    throw new RateLimitExceededException($retryAfter, 'Token rate limit exceeded');
-                }
+            $tokenLimit = $limiters['tokens']->create($this->getTokenKey($model))->consume($estimatedTokens);
+            if (!$tokenLimit->isAccepted()) {
+                $retryAfter = $tokenLimit->getRetryAfter()->getTimestamp() - time();
+                throw new RateLimitExceededException($retryAfter, 'Token rate limit exceeded');
             }
 
             $this->logger->debug('Rate limit check passed', [
                 'model' => $model->getId(),
                 'provider' => $model->getProvider()->getId(),
                 'estimated_tokens' => $estimatedTokens,
-                'requests_limiter' => $limiters['requests'] !== null ? 'enabled' : 'disabled',
-                'tokens_limiter' => $limiters['tokens'] !== null ? 'enabled' : 'disabled',
             ]);
         } catch (RateLimitExceededException $e) {
             $this->logger->warning('Rate limit exceeded', [
@@ -82,107 +72,58 @@ final class SymfonyRateLimiter implements RateLimiterInterface
         }
     }
 
+    /**
+     * Seconds until one more request and one more token are available, null when available now.
+     */
     public function getRetryAfter(ModelInterface $model): ?int
     {
         $limiters = $this->getLimitersForModel($model);
-        
-        $waitTimes = [];
-        
-        // Check request limiter if available
-        if ($limiters['requests'] !== null) {
-            $requestLimiter = $limiters['requests']->create($this->getRequestKey($model));
-            $requestReservation = $requestLimiter->reserve(1);
-            $waitTimes[] = $requestReservation->getWaitDuration();
-        }
-        
-        // Check token limiter if available
-        if ($limiters['tokens'] !== null) {
-            $tokenLimiter = $limiters['tokens']->create($this->getTokenKey($model));
-            $tokenReservation = $tokenLimiter->reserve(1);
-            $waitTimes[] = $tokenReservation->getWaitDuration();
-        }
-        
-        // Return the longest wait time from available limiters
-        if (empty($waitTimes)) {
-            return null;
-        }
-        
-        $maxRetryAfter = max($waitTimes);
-        
-        return $maxRetryAfter > 0 ? (int)$maxRetryAfter : null;
+
+        // consume(0) reads the limiter state without taking anything
+        $retryAt = max(
+            $limiters['requests']->create($this->getRequestKey($model))->consume(0)->getRetryAfter()->getTimestamp(),
+            $limiters['tokens']->create($this->getTokenKey($model))->consume(0)->getRetryAfter()->getTimestamp(),
+        );
+        $wait = $retryAt - time();
+
+        return $wait > 0 ? $wait : null;
     }
 
     /**
-     * @return array{requests: ?RateLimiterFactory, tokens: ?RateLimiterFactory}
+     * @return array{requests: RateLimiterFactoryInterface, tokens: RateLimiterFactoryInterface}
      */
     private function getLimitersForModel(ModelInterface $model): array
     {
         $providerId = $model->getProvider()->getId();
-        
-        if (!isset($this->limiters[$providerId])) {
-            $this->limiters[$providerId] = $this->createLimitersForProvider($providerId, $model);
-        }
-        
-        return $this->limiters[$providerId];
+
+        return $this->limiters[$providerId] ??= $this->createLimitersForProvider($providerId, $model);
     }
 
     /**
-     * @return array{requests: ?RateLimiterFactory, tokens: ?RateLimiterFactory}
+     * External limiters (e.g. from the Symfony bundle) win per type; missing ones fall back to internal defaults.
+     *
+     * @return array{requests: RateLimiterFactoryInterface, tokens: RateLimiterFactoryInterface}
      */
     private function createLimitersForProvider(string $providerId, ModelInterface $model): array
     {
-        $limiters = ['requests' => null, 'tokens' => null];
-        
-        // Try to use external rate limiters first (e.g., from Symfony Bundle)
-        if ($this->externalRateLimiter !== null) {
-            $hasExternalRequests = $this->externalRateLimiter->hasRateLimiter($providerId, 'requests');
-            $hasExternalTokens = $this->externalRateLimiter->hasRateLimiter($providerId, 'tokens');
-            
-            if ($hasExternalRequests || $hasExternalTokens) {
-                // Use external limiters where available
-                if ($hasExternalRequests) {
-                    $limiters['requests'] = $this->externalRateLimiter->getRateLimiter($providerId, 'requests', $model);
-                }
-                if ($hasExternalTokens) {
-                    $limiters['tokens'] = $this->externalRateLimiter->getRateLimiter($providerId, 'tokens', $model);
-                }
-                
-                // Fill in missing limiters with internal defaults
-                if ($limiters['requests'] === null) {
-                    $limiters['requests'] = $this->createInternalRequestLimiter($providerId);
-                }
-                if ($limiters['tokens'] === null) {
-                    $limiters['tokens'] = $this->createInternalTokenLimiter($providerId);
-                }
-                
-                $this->logger->debug('Using mixed external/internal rate limiters for provider', [
-                    'provider' => $providerId,
-                    'model' => $model->getId(),
-                    'external_requests' => $hasExternalRequests,
-                    'external_tokens' => $hasExternalTokens,
-                ]);
-                
-                return $limiters;
-            }
-        }
-        
-        // Fallback to default internal rate limiters
-        $this->logger->debug('Using internal rate limiters for provider', [
+        $external = $this->externalRateLimiter;
+        $hasExternalRequests = $external?->hasRateLimiter($providerId, 'requests') ?? false;
+        $hasExternalTokens = $external?->hasRateLimiter($providerId, 'tokens') ?? false;
+
+        $this->logger->debug('Rate limiters created for provider', [
             'provider' => $providerId,
             'model' => $model->getId(),
+            'external_requests' => $hasExternalRequests,
+            'external_tokens' => $hasExternalTokens,
         ]);
-        
-        return $this->createInternalLimitersForProvider($providerId);
-    }
 
-    /**
-     * @return array{requests: RateLimiterFactory, tokens: RateLimiterFactory}
-     */
-    private function createInternalLimitersForProvider(string $providerId): array
-    {
         return [
-            'requests' => $this->createInternalRequestLimiter($providerId),
-            'tokens' => $this->createInternalTokenLimiter($providerId),
+            'requests' => $external !== null && $hasExternalRequests
+                ? $external->getRateLimiter($providerId, 'requests', $model)
+                : $this->createInternalRequestLimiter($providerId),
+            'tokens' => $external !== null && $hasExternalTokens
+                ? $external->getRateLimiter($providerId, 'tokens', $model)
+                : $this->createInternalTokenLimiter($providerId),
         ];
     }
 
@@ -191,7 +132,7 @@ final class SymfonyRateLimiter implements RateLimiterInterface
         $storage = new InMemoryStorage();
         $lockFactory = $this->lockFactory ?? new LockFactory(new InMemoryStore());
         $limits = $this->getProviderLimits($providerId);
-        
+
         return new RateLimiterFactory([
             'id' => $providerId . '_requests',
             'policy' => 'token_bucket',
@@ -205,7 +146,7 @@ final class SymfonyRateLimiter implements RateLimiterInterface
         $storage = new InMemoryStorage();
         $lockFactory = $this->lockFactory ?? new LockFactory(new InMemoryStore());
         $limits = $this->getProviderLimits($providerId);
-        
+
         return new RateLimiterFactory([
             'id' => $providerId . '_tokens',
             'policy' => 'token_bucket',
@@ -219,48 +160,20 @@ final class SymfonyRateLimiter implements RateLimiterInterface
      */
     private function getProviderLimits(string $providerId): array
     {
-        return match ($providerId) {
-            'openai' => [
-                'requests' => [
-                    'limit' => 180, // Conservative 90% of 200 RPM
-                    'rate' => ['interval' => '1 minute', 'amount' => 180]
-                ],
-                'tokens' => [
-                    'limit' => 450000, // Conservative 90% of 500,000 TPM
-                    'rate' => ['interval' => '1 minute', 'amount' => 450000]
-                ]
+        // Provider defaults live on AIProvider; unknown provider ids get a conservative limit
+        $defaults = AIProvider::tryFrom($providerId)?->getDefaultRateLimits()
+            ?? ['requests_per_minute' => 60, 'tokens_per_minute' => 50000];
+
+        return [
+            'requests' => [
+                'limit' => $defaults['requests_per_minute'],
+                'rate' => ['interval' => '1 minute', 'amount' => $defaults['requests_per_minute']],
             ],
-            'anthropic' => [
-                'requests' => [
-                    'limit' => 100,
-                    'rate' => ['interval' => '1 minute', 'amount' => 100]
-                ],
-                'tokens' => [
-                    'limit' => 100000,
-                    'rate' => ['interval' => '1 minute', 'amount' => 100000]
-                ]
+            'tokens' => [
+                'limit' => $defaults['tokens_per_minute'],
+                'rate' => ['interval' => '1 minute', 'amount' => $defaults['tokens_per_minute']],
             ],
-            'gemini' => [
-                'requests' => [
-                    'limit' => 1000, // Gemini 2.5 Flash Tier 1
-                    'rate' => ['interval' => '1 minute', 'amount' => 1000]
-                ],
-                'tokens' => [
-                    'limit' => 1000000, // Gemini 2.5 Flash Tier 1
-                    'rate' => ['interval' => '1 minute', 'amount' => 1000000]
-                ]
-            ],
-            default => [
-                'requests' => [
-                    'limit' => 60, // Conservative default
-                    'rate' => ['interval' => '1 minute', 'amount' => 60]
-                ],
-                'tokens' => [
-                    'limit' => 50000, // Conservative default
-                    'rate' => ['interval' => '1 minute', 'amount' => 50000]
-                ]
-            ]
-        };
+        ];
     }
 
     private function getRequestKey(ModelInterface $model): string

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Provider;
 
@@ -15,22 +15,22 @@ final class OpenAIProviderTest extends ProviderTestCase
     {
         return new OpenAIProvider();
     }
-    
+
     protected function getExpectedId(): string
     {
         return 'openai';
     }
-    
+
     protected function getExpectedName(): string
     {
         return 'OpenAI';
     }
-    
+
     protected function getExpectedModelIds(): array
     {
         return ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'];
     }
-    
+
     protected function getProviderEnum(): AIProvider
     {
         return AIProvider::OPENAI;
@@ -39,7 +39,7 @@ final class OpenAIProviderTest extends ProviderTestCase
     public function testGetModelsReturnsConfigurableModelInstances(): void
     {
         $models = $this->provider->getModels();
-        
+
         foreach ($models as $model) {
             $this->assertInstanceOf(ConfigurableModel::class, $model);
         }
@@ -48,7 +48,14 @@ final class OpenAIProviderTest extends ProviderTestCase
     public function testGetModelReturnsConfigurableModel(): void
     {
         $model = $this->provider->getModel('gpt-4o-mini');
-        
+
         $this->assertInstanceOf(ConfigurableModel::class, $model);
+    }
+
+    public function testConstructorSetsTheDefaultModel(): void
+    {
+        $modelId = (new OpenAIProvider())->getAvailableModels()[1];
+
+        $this->assertSame($modelId, (new OpenAIProvider($modelId))->getDefaultModel());
     }
 }

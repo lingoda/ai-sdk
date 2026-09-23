@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit;
 
@@ -26,29 +26,43 @@ final class PlatformAudioTest extends TestCase
     {
         $provider = $this->createMock(ProviderInterface::class);
         $provider->method('getId')->willReturn('openai');
-        
+
         return new class($provider) implements AudioCapableInterface, ClientInterface {
-            public function __construct(private ProviderInterface $provider) {}
-            
-            public function getProvider(): ProviderInterface { return $this->provider; }
-            public function supports($model): bool { return true; }
-            public function request($model, $payload, array $options = []): ResultInterface {
-                throw new \Exception('Not implemented'); 
+            public function __construct(
+                private ProviderInterface $provider
+            ) {
             }
-            
-            public function textToSpeech(string $input, AudioOptionsInterface $options): BinaryResult {
+
+            public function getProvider(): ProviderInterface
+            {
+                return $this->provider;
+            }
+            public function supports($model): bool
+            {
+                return true;
+            }
+            public function request($model, $payload, array $options = []): ResultInterface
+            {
+                throw new \Exception('Not implemented');
+            }
+
+            public function textToSpeech(string $input, AudioOptionsInterface $options): BinaryResult
+            {
                 return new BinaryResult('audio data', 'audio/mpeg');
             }
-            
-            public function textToSpeechStream(string $input, AudioOptionsInterface $options): StreamResult {
+
+            public function textToSpeechStream(string $input, AudioOptionsInterface $options): StreamResult
+            {
                 return new StreamResult(Stream::create('streaming audio data'), 'audio/mpeg');
             }
-            
-            public function speechToText(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult {
+
+            public function speechToText(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult
+            {
                 return new TextResult('transcribed text');
             }
-            
-            public function translate(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult {
+
+            public function translate(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult
+            {
                 return new TextResult('translated text');
             }
         };
@@ -58,14 +72,24 @@ final class PlatformAudioTest extends TestCase
     {
         $provider = $this->createMock(ProviderInterface::class);
         $provider->method('getId')->willReturn('anthropic');
-        
+
         return new class($provider) implements ClientInterface {
-            public function __construct(private ProviderInterface $provider) {}
-            
-            public function getProvider(): ProviderInterface { return $this->provider; }
-            public function supports($model): bool { return true; }
-            public function request($model, $payload, array $options = []): ResultInterface {
-                throw new \Exception('Not implemented'); 
+            public function __construct(
+                private ProviderInterface $provider
+            ) {
+            }
+
+            public function getProvider(): ProviderInterface
+            {
+                return $this->provider;
+            }
+            public function supports($model): bool
+            {
+                return true;
+            }
+            public function request($model, $payload, array $options = []): ResultInterface
+            {
+                throw new \Exception('Not implemented');
             }
         };
     }
@@ -74,7 +98,7 @@ final class PlatformAudioTest extends TestCase
     {
         $audioClient = $this->createAudioCapableClient();
         $platform = new Platform([$audioClient]);
-        
+
         $options = AudioOptions::textToSpeech();
         $result = $platform->textToSpeech('Hello world', $options);
 
@@ -104,6 +128,72 @@ final class PlatformAudioTest extends TestCase
 
         $options = AudioOptions::textToSpeech();
         $platform->textToSpeech('Hello world', $options);
+    }
+
+    public function test_textToSpeechStream_throws_exception_for_empty_input(): void
+    {
+        $platform = new Platform([$this->createAudioCapableClient()]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Text input cannot be empty for text-to-speech conversion.');
+
+        $platform->textToSpeechStream("  \n ", AudioOptions::textToSpeech());
+    }
+
+    public function test_transcribeAudio_throws_exception_for_unreadable_file(): void
+    {
+        $platform = new Platform([$this->createAudioCapableClient()]);
+        $tempFile = (string) tempnam(sys_get_temp_dir(), 'unreadable_audio_test');
+        chmod($tempFile, 0o000);
+
+        try {
+            if (is_readable($tempFile)) {
+                $this->markTestSkipped('File permissions are not enforced for the current user (e.g. root).');
+            }
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Audio file is not readable: ' . $tempFile);
+
+            $platform->transcribeAudio($tempFile, AudioOptions::speechToText());
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function test_transcribeAudio_throws_exception_when_file_cannot_be_opened(): void
+    {
+        // A stream wrapper that stats as a readable file but refuses to open is the only way to
+        // pass the file_exists/is_readable/filesize checks and still make fopen() fail
+        $wrapper = new class() {
+            /** @var resource|null */
+            public $context;
+
+            /** @return array<string, int> */
+            public function url_stat(string $path, int $flags): array
+            {
+                return ['mode' => 0o100444, 'size' => 10];
+            }
+
+            public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
+            {
+                return false;
+            }
+        };
+        stream_wrapper_register('unopenable', $wrapper::class);
+        // fopen() on the wrapper emits a warning before returning false
+        set_error_handler(static fn (int $errno): bool => $errno === E_WARNING);
+
+        try {
+            $platform = new Platform([$this->createAudioCapableClient()]);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Could not open audio file: unopenable://audio.mp3');
+
+            $platform->transcribeAudio('unopenable://audio.mp3', AudioOptions::speechToText());
+        } finally {
+            restore_error_handler();
+            stream_wrapper_unregister('unopenable');
+        }
     }
 
     public function test_transcribeAudio_throws_exception_for_missing_file(): void
@@ -208,7 +298,7 @@ final class PlatformAudioTest extends TestCase
     {
         $audioClient = $this->createAudioCapableClient();
         $platform = new Platform([$audioClient]);
-        
+
         $options = AudioOptions::textToSpeech();
         $result = $platform->textToSpeechStream('Hello world', $options);
 
@@ -219,14 +309,14 @@ final class PlatformAudioTest extends TestCase
     {
         $audioClient = $this->createAudioCapableClient();
         $platform = new Platform([$audioClient]);
-        
+
         // Create options for a different provider
-        $incompatibleOptions = new class implements AudioOptionsInterface {
+        $incompatibleOptions = new class() implements AudioOptionsInterface {
             public function toArray(): array
             {
                 return ['model' => 'some-model'];
             }
-            
+
             public function getProvider(): string
             {
                 return 'anthropic'; // Different provider
@@ -243,40 +333,64 @@ final class PlatformAudioTest extends TestCase
     {
         $provider1 = $this->createMock(ProviderInterface::class);
         $provider1->method('getId')->willReturn('anthropic');
-        
+
         $provider2 = $this->createMock(ProviderInterface::class);
         $provider2->method('getId')->willReturn('openai');
-        
+
         $nonAudioClient = new class($provider1) implements ClientInterface {
-            public function __construct(private ProviderInterface $provider) {}
-            public function getProvider(): ProviderInterface { return $this->provider; }
-            public function supports($model): bool { return true; }
-            public function request($model, $payload, array $options = []): ResultInterface {
-                throw new \Exception('Not implemented'); 
+            public function __construct(
+                private ProviderInterface $provider
+            ) {
+            }
+            public function getProvider(): ProviderInterface
+            {
+                return $this->provider;
+            }
+            public function supports($model): bool
+            {
+                return true;
+            }
+            public function request($model, $payload, array $options = []): ResultInterface
+            {
+                throw new \Exception('Not implemented');
             }
         };
-        
+
         $audioClient = new class($provider2) implements AudioCapableInterface, ClientInterface {
-            public function __construct(private ProviderInterface $provider) {}
-            public function getProvider(): ProviderInterface { return $this->provider; }
-            public function supports($model): bool { return true; }
-            public function request($model, $payload, array $options = []): ResultInterface {
-                throw new \Exception('Not implemented'); 
+            public function __construct(
+                private ProviderInterface $provider
+            ) {
             }
-            
-            public function textToSpeech(string $input, AudioOptionsInterface $options): BinaryResult {
+            public function getProvider(): ProviderInterface
+            {
+                return $this->provider;
+            }
+            public function supports($model): bool
+            {
+                return true;
+            }
+            public function request($model, $payload, array $options = []): ResultInterface
+            {
+                throw new \Exception('Not implemented');
+            }
+
+            public function textToSpeech(string $input, AudioOptionsInterface $options): BinaryResult
+            {
                 return new BinaryResult('audio data', 'audio/mpeg');
             }
-            
-            public function textToSpeechStream(string $input, AudioOptionsInterface $options): StreamResult {
+
+            public function textToSpeechStream(string $input, AudioOptionsInterface $options): StreamResult
+            {
                 return new StreamResult(Stream::create('streaming audio data'), 'audio/mpeg');
             }
-            
-            public function speechToText(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult {
+
+            public function speechToText(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult
+            {
                 return new TextResult('transcribed text');
             }
-            
-            public function translate(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult {
+
+            public function translate(StreamInterface $audioStream, AudioOptionsInterface $options): TextResult
+            {
                 return new TextResult('translated text');
             }
         };

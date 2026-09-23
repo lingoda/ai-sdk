@@ -9,6 +9,9 @@ enum AIProvider: string
     case OPENAI = 'openai';
     case ANTHROPIC = 'anthropic';
     case GEMINI = 'gemini';
+    case BEDROCK = 'bedrock';
+    /** Decisions only (DecisionPlatformInterface), never a chat provider: Platform::ask() cannot route to it */
+    case TYPESAFE = 'typesafe';
 
     public function getName(): string
     {
@@ -16,6 +19,8 @@ enum AIProvider: string
             self::OPENAI => 'OpenAI',
             self::ANTHROPIC => 'Anthropic',
             self::GEMINI => 'Google Gemini',
+            self::BEDROCK => 'AWS Bedrock',
+            self::TYPESAFE => 'TypeSafe',
         };
     }
 
@@ -38,6 +43,14 @@ enum AIProvider: string
             self::GEMINI => [
                 'requests_per_minute' => 1000, // Tier 1 limits
                 'tokens_per_minute' => 1000000,
+            ],
+            self::BEDROCK => [
+                'requests_per_minute' => 60,
+                'tokens_per_minute' => 100000,
+            ],
+            self::TYPESAFE => [
+                'requests_per_minute' => 1080, // Conservative 90% of 1,200 RPM
+                'tokens_per_minute' => 13500000, // Conservative 90% of 250K tokens per second
             ],
         };
     }

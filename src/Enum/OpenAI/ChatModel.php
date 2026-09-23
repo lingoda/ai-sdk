@@ -16,7 +16,7 @@ enum ChatModel: string implements ModelConfigurationInterface
     case GPT_5_MINI_20250807 = 'gpt-5-mini-2025-08-07';
     case GPT_5_NANO = 'gpt-5-nano';
     case GPT_5_NANO_20250807 = 'gpt-5-nano-2025-08-07';
-    
+
     // GPT-4.1 Series (April 2025) - 1M context window
     case GPT_41 = 'gpt-4.1';
     case GPT_41_20250414 = 'gpt-4.1-2025-04-14';
@@ -24,13 +24,13 @@ enum ChatModel: string implements ModelConfigurationInterface
     case GPT_41_MINI_20250414 = 'gpt-4.1-mini-2025-04-14';
     case GPT_41_NANO = 'gpt-4.1-nano';
     case GPT_41_NANO_20250414 = 'gpt-4.1-nano-2025-04-14';
-    
+
     // GPT-4o Series (Current) - 128K context window
     case GPT_4O = 'gpt-4o';
     case GPT_4O_20241120 = 'gpt-4o-2024-11-20';
     case GPT_4O_MINI = 'gpt-4o-mini';
     case GPT_4O_MINI_20240718 = 'gpt-4o-mini-2024-07-18';
-    
+
     // GPT-4 Turbo (Legacy)
     case GPT_4_TURBO = 'gpt-4-turbo';
     case GPT_4_TURBO_20240409 = 'gpt-4-turbo-2024-04-09';
@@ -46,13 +46,13 @@ enum ChatModel: string implements ModelConfigurationInterface
             // GPT-5 series - Assumed very high context (likely 1M+ based on progression)
             self::GPT_5,
             self::GPT_5_20250807 => 2000000, // 2M estimated
-            
+
             // GPT-5 mini/nano series
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807,
             self::GPT_5_NANO,
             self::GPT_5_NANO_20250807 => 1000000, // 1M estimated
-            
+
             // GPT-4.1 series with 1M context window (confirmed from search)
             self::GPT_41,
             self::GPT_41_20250414,
@@ -60,7 +60,7 @@ enum ChatModel: string implements ModelConfigurationInterface
             self::GPT_41_MINI_20250414,
             self::GPT_41_NANO,
             self::GPT_41_NANO_20250414 => 1000000,
-            
+
             // GPT-4o series with 128K context window (confirmed)
             self::GPT_4O,
             self::GPT_4O_20241120,
@@ -81,10 +81,11 @@ enum ChatModel: string implements ModelConfigurationInterface
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
+                Capability::DOCUMENT,
                 Capability::MULTIMODAL,
                 Capability::REASONING,
             ],
-            
+
             // GPT-5 mini/nano - Efficient models with full capabilities
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807,
@@ -101,20 +102,27 @@ enum ChatModel: string implements ModelConfigurationInterface
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
+                Capability::DOCUMENT,
                 Capability::MULTIMODAL,
             ],
 
-            // GPT-4 Turbo
-            self::GPT_4_TURBO,
-            self::GPT_4_TURBO_20240409,
             // GPT-4.1 efficient models
             self::GPT_41_MINI,
             self::GPT_41_MINI_20250414 => [
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
+                Capability::DOCUMENT,
             ],
-            
+
+            // GPT-4 Turbo: vision, but PDF file input needs gpt-4o or later
+            self::GPT_4_TURBO,
+            self::GPT_4_TURBO_20240409 => [
+                Capability::TEXT,
+                Capability::TOOLS,
+                Capability::VISION,
+            ],
+
             // GPT-4.1 nano - Text and tools focused
             self::GPT_41_NANO,
             self::GPT_41_NANO_20250414 => [
@@ -144,7 +152,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 32768,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-5 efficient models
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807 => [
@@ -152,7 +160,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 16384,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-5 nano - Most efficient
             self::GPT_5_NANO,
             self::GPT_5_NANO_20250807 => [
@@ -160,7 +168,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 8192,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-4.1 flagship models - API validated: 32,768 max tokens
             self::GPT_41,
             self::GPT_41_20250414 => [
@@ -168,7 +176,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 32768,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-4.1 efficient models - API validated: 32,768 max tokens
             self::GPT_41_MINI,
             self::GPT_41_MINI_20250414 => [
@@ -176,7 +184,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 32768,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-4.1 nano - API validated: 32,768 max tokens
             self::GPT_41_NANO,
             self::GPT_41_NANO_20250414 => [
@@ -184,7 +192,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 32768,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-4o models - API validated: 16,384 max tokens
             self::GPT_4O,
             self::GPT_4O_20241120,
@@ -194,7 +202,7 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'max_tokens' => 16384,
                 'top_p' => 1.0,
             ],
-            
+
             // GPT-4 Turbo
             self::GPT_4_TURBO,
             self::GPT_4_TURBO_20240409 => [

@@ -7,6 +7,7 @@ namespace Lingoda\AiSdk\Tests\Unit;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ModelNotFoundException;
+use Lingoda\AiSdk\Exception\RuntimeException;
 use Lingoda\AiSdk\Platform;
 use Lingoda\AiSdk\Prompt\Conversation;
 use Lingoda\AiSdk\Prompt\SystemPrompt;
@@ -64,6 +65,26 @@ final class PlatformTest extends TestCase
         $this->expectException(ModelNotFoundException::class);
 
         $platform->ask('Hello', $model->getId());
+    }
+
+    public function testAskThrowsWhenSingleClientDoesNotSupportItsDefaultModel(): void
+    {
+        $provider = new OpenAIProvider();
+
+        $client = $this->createMock(ClientInterface::class);
+        $client->method('getProvider')->willReturn($provider);
+        $client->method('supports')->willReturn(false);
+        $client->expects($this->never())->method('request');
+
+        $platform = new Platform([$client]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf(
+            'No client found that supports model "%s" from provider "openai"',
+            $provider->getDefaultModel()
+        ));
+
+        $platform->ask('Hello');
     }
 
     public function testGetProvider(): void

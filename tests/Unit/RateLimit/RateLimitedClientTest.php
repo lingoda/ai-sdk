@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
@@ -28,13 +28,15 @@ final class RateLimitedClientTest extends TestCase
         $underlyingClient->method('supports')->with($model)->willReturn(true);
         $underlyingClient->method('getProvider')->willReturn($provider);
         $underlyingClient->method('request')
-            ->willReturn(new TextResult('Success', []));
+            ->willReturn(new TextResult('Success', []))
+        ;
 
         // Mock rate limiter that allows the request
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->expects($this->once())
             ->method('consume')
-            ->with($model, $this->greaterThan(0));
+            ->with($model, $this->greaterThan(0))
+        ;
 
         $estimatorRegistry = TokenEstimatorRegistry::createDefault();
 
@@ -63,7 +65,8 @@ final class RateLimitedClientTest extends TestCase
         $underlyingClient->method('supports')->with($model)->willReturn(true);
         $underlyingClient->method('getProvider')->willReturn($provider);
         $underlyingClient->method('request')
-            ->willReturn(new TextResult('Success after retry', []));
+            ->willReturn(new TextResult('Success after retry', []))
+        ;
 
         // Mock rate limiter that fails first time, succeeds second time
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
@@ -73,7 +76,8 @@ final class RateLimitedClientTest extends TestCase
             ->willReturnOnConsecutiveCalls(
                 $this->throwException(new RateLimitExceededException(1, 'Rate limit exceeded')),
                 null // Success on second call
-            );
+            )
+        ;
 
         $estimatorRegistry = TokenEstimatorRegistry::createDefault();
 
@@ -152,7 +156,8 @@ final class RateLimitedClientTest extends TestCase
         $rateLimiter->expects($this->exactly(10)) // MAX_RETRIES
             ->method('consume')
             ->with($model, $this->greaterThan(0))
-            ->willThrowException(new RateLimitExceededException(1, 'Rate limit exceeded'));
+            ->willThrowException(new RateLimitExceededException(1, 'Rate limit exceeded'))
+        ;
 
         $estimatorRegistry = TokenEstimatorRegistry::createDefault();
 
@@ -180,12 +185,14 @@ final class RateLimitedClientTest extends TestCase
         $underlyingClient->method('supports')->with($model)->willReturn(true);
         $underlyingClient->method('getProvider')->willReturn($provider);
         $underlyingClient->method('request')
-            ->willThrowException(new \InvalidArgumentException('Invalid input'));
+            ->willThrowException(new \InvalidArgumentException('Invalid input'))
+        ;
 
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->expects($this->once())
             ->method('consume')
-            ->with($model, $this->greaterThan(0));
+            ->with($model, $this->greaterThan(0))
+        ;
 
         $estimatorRegistry = TokenEstimatorRegistry::createDefault();
 
@@ -217,12 +224,14 @@ final class RateLimitedClientTest extends TestCase
             ->willReturnOnConsecutiveCalls(
                 $this->throwException(new \RuntimeException('API returned status 503')), // Retryable 5xx
                 new TextResult('Success after retry', [])
-            );
+            )
+        ;
 
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->expects($this->exactly(2))
             ->method('consume')
-            ->with($model, $this->greaterThan(0));
+            ->with($model, $this->greaterThan(0))
+        ;
 
         $estimatorRegistry = TokenEstimatorRegistry::createDefault();
         $logger = $this->createMock(LoggerInterface::class);
@@ -255,7 +264,8 @@ final class RateLimitedClientTest extends TestCase
         $underlyingClient->method('supports')->with($model)->willReturn(true);
         $underlyingClient->method('getProvider')->willReturn($provider);
         $underlyingClient->method('request')
-            ->willThrowException(new \RuntimeException('API returned status 503')); // Always retryable
+            ->willThrowException(new \RuntimeException('API returned status 503')) // Always retryable
+        ;
 
         $rateLimiter = $this->createMock(RateLimiterInterface::class);
         $rateLimiter->method('consume'); // Allow all calls
@@ -373,13 +383,11 @@ final class RateLimitedClientTest extends TestCase
 
         $logger->expects($this->once())->method('warning')->with(
             'Rate limit exceeded. Waiting before retry.',
-            $this->callback(function ($context) {
-                return $context['retry_after'] === 3 && $context['attempt'] === 1;
-            })
+            $this->callback(fn ($context) => $context['retry_after'] === 3 && $context['attempt'] === 1)
         );
 
         $testDelay = new TestDelay();
-        
+
         $rateLimitedClient = new RateLimitedClient(
             $underlyingClient,
             $rateLimiter,
@@ -426,5 +434,136 @@ final class RateLimitedClientTest extends TestCase
         $this->expectExceptionMessage('Final rate limit');
 
         $method->invokeArgs($rateLimitedClient, [$exception, 9]); // MAX_RETRIES - 1
+    }
+
+    public function testRateLimitExceededIsRethrownImmediatelyWhenRetriesDisabled(): void
+    {
+        $model = (new OpenAIProvider())->getModel('gpt-4o-mini');
+
+        $underlyingClient = $this->createMock(ClientInterface::class);
+        $underlyingClient->expects($this->never())->method('request');
+
+        $exception = new RateLimitExceededException(5, 'Rate limit exceeded');
+        $rateLimiter = $this->createMock(RateLimiterInterface::class);
+        $rateLimiter->expects($this->once())->method('consume')->willThrowException($exception);
+
+        $testDelay = new TestDelay();
+
+        $rateLimitedClient = new RateLimitedClient(
+            $underlyingClient,
+            $rateLimiter,
+            TokenEstimatorRegistry::createDefault(),
+            delay: $testDelay,
+            enableRetries: false
+        );
+
+        try {
+            $rateLimitedClient->request($model, 'Hello world');
+            $this->fail('Expected the rate limit exception to be rethrown');
+        } catch (RateLimitExceededException $e) {
+            $this->assertSame($exception, $e);
+        }
+
+        $this->assertSame(0, $testDelay->getDelayCallCount());
+    }
+
+    public function testTransportErrorIsNotRetriedWhenRetryTransportErrorsDisabled(): void
+    {
+        $model = (new OpenAIProvider())->getModel('gpt-4o-mini');
+
+        $underlyingClient = $this->createMock(ClientInterface::class);
+        $underlyingClient->expects($this->once())
+            ->method('request')
+            ->willThrowException(new \RuntimeException('Connection timeout occurred'))
+        ;
+
+        $rateLimiter = $this->createMock(RateLimiterInterface::class);
+        $rateLimiter->expects($this->once())->method('consume');
+
+        $testDelay = new TestDelay();
+
+        $rateLimitedClient = new RateLimitedClient(
+            $underlyingClient,
+            $rateLimiter,
+            TokenEstimatorRegistry::createDefault(),
+            delay: $testDelay,
+            retryTransportErrors: false
+        );
+
+        try {
+            $rateLimitedClient->request($model, 'Hello world');
+            $this->fail('Expected the transport error to be rethrown');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Connection timeout occurred', $e->getMessage());
+        }
+
+        $this->assertSame(0, $testDelay->getDelayCallCount());
+    }
+
+    public function testRateLimitIsStillRetriedWhenRetryTransportErrorsDisabled(): void
+    {
+        $model = (new OpenAIProvider())->getModel('gpt-4o-mini');
+
+        $underlyingClient = $this->createMock(ClientInterface::class);
+        $underlyingClient->expects($this->once())
+            ->method('request')
+            ->willReturn(new TextResult('Success after wait', []))
+        ;
+
+        $rateLimiter = $this->createMock(RateLimiterInterface::class);
+        $rateLimiter->expects($this->exactly(2))
+            ->method('consume')
+            ->willReturnOnConsecutiveCalls(
+                $this->throwException(new RateLimitExceededException(2, 'Rate limit exceeded')),
+                null
+            )
+        ;
+
+        $testDelay = new TestDelay();
+
+        $rateLimitedClient = new RateLimitedClient(
+            $underlyingClient,
+            $rateLimiter,
+            TokenEstimatorRegistry::createDefault(),
+            delay: $testDelay,
+            retryTransportErrors: false
+        );
+
+        $result = $rateLimitedClient->request($model, 'Hello world');
+
+        $this->assertSame('Success after wait', $result->getContent());
+        $this->assertSame([2], $testDelay->getDelayCalls());
+    }
+
+    public function testTransportErrorsAreRetriedByDefault(): void
+    {
+        $model = (new OpenAIProvider())->getModel('gpt-4o-mini');
+
+        $underlyingClient = $this->createMock(ClientInterface::class);
+        $underlyingClient->expects($this->exactly(3))
+            ->method('request')
+            ->willReturnOnConsecutiveCalls(
+                $this->throwException(new \RuntimeException('Connection timeout occurred')),
+                $this->throwException(new \RuntimeException('Connection timeout occurred')),
+                new TextResult('Success after retries', [])
+            )
+        ;
+
+        $rateLimiter = $this->createMock(RateLimiterInterface::class);
+        $rateLimiter->expects($this->exactly(3))->method('consume');
+
+        $testDelay = new TestDelay();
+
+        $rateLimitedClient = new RateLimitedClient(
+            $underlyingClient,
+            $rateLimiter,
+            TokenEstimatorRegistry::createDefault(),
+            delay: $testDelay
+        );
+
+        $result = $rateLimitedClient->request($model, 'Hello world');
+
+        $this->assertSame('Success after retries', $result->getContent());
+        $this->assertSame([1, 2], $testDelay->getDelayCalls());
     }
 }

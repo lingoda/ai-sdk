@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Client\Gemini;
 
@@ -12,15 +12,21 @@ use Gemini\Data\Part;
 use Gemini\Data\Schema;
 use Gemini\Enums\DataType;
 use Gemini\Enums\FinishReason;
+use Gemini\Enums\MimeType;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
-use Lingoda\AiSdk\Exception\InvalidArgumentException;
-use Lingoda\AiSdk\Exception\ClientException;
-use Lingoda\AiSdk\Exception\ResponseDecodeException;
 use Lingoda\AiSdk\Client\Gemini\GeminiClient;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Enum\AIProvider;
+use Lingoda\AiSdk\Exception\ClientException;
+use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Exception\ResponseDecodeException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Prompt\Attachment;
+use Lingoda\AiSdk\Prompt\Conversation;
+use Lingoda\AiSdk\Prompt\SystemPrompt;
+use Lingoda\AiSdk\Prompt\UserPrompt;
 use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\ObjectResult;
@@ -39,17 +45,17 @@ final class GeminiClientTest extends ClientTestCase
     {
         return new GeminiClient($apiClient, $logger);
     }
-    
+
     protected function getProviderEnum(): AIProvider
     {
         return AIProvider::GEMINI;
     }
-    
+
     protected function getApiClientClass(): string
     {
         return GeminiAPIClient::class;
     }
-    
+
     protected function getDefaultModelId(): string
     {
         return 'gemini-1.5-flash';
@@ -65,16 +71,16 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(1, $result['contents']);
-        
+
         $content = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content);
         self::assertEquals(Role::USER, $content->role);
         self::assertCount(1, $content->parts);
-        
+
         $part = $content->parts[0];
         self::assertInstanceOf(Part::class, $part);
         self::assertSame('Hello world', $part->text);
-        
+
         self::assertArrayHasKey('generationConfig', $result);
         self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
         self::assertSame(4096, $result['generationConfig']->maxOutputTokens);
@@ -95,24 +101,24 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(2, $result['contents']);
-        
+
         // Check user message
         $userContent = $result['contents'][0];
         self::assertInstanceOf(Content::class, $userContent);
         self::assertEquals(Role::USER, $userContent->role);
         self::assertSame('What is PHP?', $userContent->parts[0]->text);
-        
+
         // Check assistant message (becomes model in Gemini)
         $assistantContent = $result['contents'][1];
         self::assertInstanceOf(Content::class, $assistantContent);
         self::assertEquals(Role::MODEL, $assistantContent->role);
         self::assertSame('PHP is a programming language', $assistantContent->parts[0]->text);
-        
+
         // Check system instruction
         self::assertArrayHasKey('systemInstruction', $result);
         self::assertInstanceOf(Content::class, $result['systemInstruction']);
         self::assertSame('You are a helpful assistant', $result['systemInstruction']->parts[0]->text);
-        
+
         self::assertArrayHasKey('generationConfig', $result);
         self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
         self::assertSame(4096, $result['generationConfig']->maxOutputTokens);
@@ -139,20 +145,30 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(2, $result['contents']);
-        
+
         // Check first message (user)
         $content1 = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content1);
         self::assertEquals(Role::USER, $content1->role);
         self::assertSame('Hello Gemini', $content1->parts[0]->text);
-        
+
         // Check second message (model)
         $content2 = $result['contents'][1];
         self::assertInstanceOf(Content::class, $content2);
         self::assertEquals(Role::MODEL, $content2->role);
         self::assertSame('Hello there!', $content2->parts[0]->text);
-        
+
         self::assertArrayNotHasKey('systemInstruction', $result);
+    }
+
+    public function testBuildChatPayloadWithContentObjectsInContentsArray(): void
+    {
+        $content = new Content(parts: [new Part(text: 'Prebuilt')], role: Role::USER);
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, ['contents' => [$content]], []]);
+
+        self::assertCount(1, $result['contents']);
+        self::assertSame($content, $result['contents'][0]);
     }
 
     public function testBuildChatPayloadWithGenericMessagesArray(): void
@@ -170,13 +186,13 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(2, $result['contents']);
-        
+
         // Check user message
         $userContent = $result['contents'][0];
         self::assertInstanceOf(Content::class, $userContent);
         self::assertEquals(Role::USER, $userContent->role);
         self::assertSame('Hello', $userContent->parts[0]->text);
-        
+
         // Check assistant message (becomes model in Gemini)
         $assistantContent = $result['contents'][1];
         self::assertInstanceOf(Content::class, $assistantContent);
@@ -197,13 +213,13 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(1, $result['contents']);
-        
+
         // Check user message
         $userContent = $result['contents'][0];
         self::assertInstanceOf(Content::class, $userContent);
         self::assertEquals(Role::USER, $userContent->role);
         self::assertSame('Review this PHP code', $userContent->parts[0]->text);
-        
+
         // Check system instruction
         self::assertArrayHasKey('systemInstruction', $result);
         self::assertInstanceOf(Content::class, $result['systemInstruction']);
@@ -223,19 +239,19 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(2, $result['contents']);
-        
+
         // Check user message
         $userContent = $result['contents'][0];
         self::assertInstanceOf(Content::class, $userContent);
         self::assertEquals(Role::USER, $userContent->role);
         self::assertSame('What is 2+2?', $userContent->parts[0]->text);
-        
+
         // Check assistant message (becomes model in Gemini)
         $assistantContent = $result['contents'][1];
         self::assertInstanceOf(Content::class, $assistantContent);
         self::assertEquals(Role::MODEL, $assistantContent->role);
         self::assertSame('2+2 equals 4', $assistantContent->parts[0]->text);
-        
+
         self::assertArrayNotHasKey('systemInstruction', $result); // No system instruction when not provided
     }
 
@@ -273,12 +289,12 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(1, $result['contents']);
-        
+
         $content = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content);
         self::assertEquals(Role::USER, $content->role);
         self::assertSame('', $content->parts[0]->text);
-        
+
         self::assertArrayNotHasKey('systemInstruction', $result); // No system instruction for empty string
     }
 
@@ -323,6 +339,27 @@ final class GeminiClientTest extends ClientTestCase
         self::assertSame(0.5, $result['generationConfig']->temperature); // Options set temperature
         self::assertSame(2048, $result['generationConfig']->maxOutputTokens); // Options override default calculation
         self::assertSame(0.9, $result['generationConfig']->topP); // topP is in generationConfig
+    }
+
+    public function testBuildChatPayloadWithTopKFromOptions(): void
+    {
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, 'Test message', ['top_k' => 40]]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(40, $result['generationConfig']->topK);
+    }
+
+    public function testBuildChatPayloadWithTopKFromModelOptions(): void
+    {
+        $model = $this->createMock(ModelInterface::class);
+        $model->method('getId')->willReturn('gemini-2.0-flash-exp');
+        $model->method('getOptions')->willReturn(['topK' => 20]);
+        $model->method('getMaxTokens')->willReturn(8192);
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$model, 'Test message', []]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(20, $result['generationConfig']->topK);
     }
 
     public function testBuildChatPayloadWithCustomMaxTokensFromModel(): void
@@ -396,25 +433,25 @@ final class GeminiClientTest extends ClientTestCase
 
         self::assertArrayHasKey('contents', $result);
         self::assertCount(3, $result['contents']);
-        
+
         // Check first message (user)
         $content1 = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content1);
         self::assertEquals(Role::USER, $content1->role);
         self::assertSame('Hello', $content1->parts[0]->text);
-        
+
         // Check second message (assistant -> model)
         $content2 = $result['contents'][1];
         self::assertInstanceOf(Content::class, $content2);
         self::assertEquals(Role::MODEL, $content2->role);
         self::assertSame('Hi', $content2->parts[0]->text);
-        
+
         // Check third message (user)
         $content3 = $result['contents'][2];
         self::assertInstanceOf(Content::class, $content3);
         self::assertEquals(Role::USER, $content3->role);
         self::assertSame('How are you?', $content3->parts[0]->text);
-        
+
         // System message should become systemInstruction
         self::assertArrayHasKey('systemInstruction', $result);
         self::assertInstanceOf(Content::class, $result['systemInstruction']);
@@ -436,13 +473,13 @@ final class GeminiClientTest extends ClientTestCase
 
         self::assertArrayHasKey('contents', $result);
         self::assertCount(2, $result['contents']);
-        
+
         // Check first valid message (user)
         $content1 = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content1);
         self::assertEquals(Role::USER, $content1->role);
         self::assertSame('Valid message', $content1->parts[0]->text);
-        
+
         // Check second valid message (assistant -> model)
         $content2 = $result['contents'][1];
         self::assertInstanceOf(Content::class, $content2);
@@ -462,12 +499,12 @@ final class GeminiClientTest extends ClientTestCase
         self::assertArrayNotHasKey('model', $result); // Gemini doesn't include model in payload
         self::assertArrayHasKey('contents', $result);
         self::assertCount(1, $result['contents']);
-        
+
         $content = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content);
         self::assertEquals(Role::USER, $content->role);
         self::assertSame('Hello Gemini', $content->parts[0]->text);
-        
+
         self::assertArrayNotHasKey('systemInstruction', $result); // No system instruction when not provided
     }
 
@@ -491,7 +528,7 @@ final class GeminiClientTest extends ClientTestCase
         // Should use contents array, not messages array
         self::assertArrayHasKey('contents', $result);
         self::assertCount(1, $result['contents']);
-        
+
         $content = $result['contents'][0];
         self::assertInstanceOf(Content::class, $content);
         self::assertEquals(Role::USER, $content->role);
@@ -694,6 +731,18 @@ final class GeminiClientTest extends ClientTestCase
         $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, $options]);
     }
 
+    public function testBuildChatPayloadWithNonScalarResponseSchemaExampleThrows(): void
+    {
+        $options = [
+            'response_schema' => ['type' => 'STRING', 'example' => new \stdClass()],
+        ];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Response schema "example" must be a scalar or an array.');
+
+        $this->invokePrivateMethod('buildChatPayload', [$this->model, 'Test message', $options]);
+    }
+
     public function testBuildChatPayloadMapsAllResponseSchemaFields(): void
     {
         $payload = 'Test message';
@@ -808,27 +857,27 @@ final class GeminiClientTest extends ClientTestCase
     public function testGetProviderReturnsGeminiProvider(): void
     {
         $provider = $this->client->getProvider();
-        
+
         $this->assertInstanceOf(GeminiProvider::class, $provider);
     }
-    
+
     public function testRequestSuccessSimple(): void
     {
         $payload = 'Test message';
         $options = [];
-        
+
         // Create a model that already has maxOutputTokens to avoid generation config path
         $model = $this->createMockModel('gemini-1.5-flash', ['maxOutputTokens' => 1000], 4096);
-        
+
         $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
         $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
         $result = $this->createMock(ResultInterface::class);
-        
+
         // Setup expectations for method calls
         $this->apiClient->method('generativeModel')->with('gemini-1.5-flash')->willReturn($generativeModel);
         $generativeModel->method('withGenerationConfig')->willReturnSelf();
         $generativeModel->method('generateContent')->willReturn($response);
-        
+
         $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
         $resultConverter->expects($this->once())
             ->method('convert')
@@ -836,14 +885,15 @@ final class GeminiClientTest extends ClientTestCase
                 $this->equalTo($model),
                 $this->identicalTo($response)
             )
-            ->willReturn($result);
-        
+            ->willReturn($result)
+        ;
+
         // Use reflection to inject the result converter
         $reflection = new ReflectionClass($this->client);
         $property = $reflection->getProperty('resultConverter');
         $property->setAccessible(true);
         $property->setValue($this->client, $resultConverter);
-        
+
         $actualResult = $this->client->request($model, $payload, $options);
 
         $this->assertSame($result, $actualResult);
@@ -989,29 +1039,28 @@ final class GeminiClientTest extends ClientTestCase
         $payload = 'Test message';
         $options = [];
         $exception = new \Exception('API error');
-        
+
         $this->apiClient->method('generativeModel')->willThrowException($exception);
-        
+
         $this->logger->expects($this->once())->method('error')->with(
             'Gemini request failed',
-            $this->callback(function ($context) {
-                return isset($context['exception']) && 
-                       isset($context['model']) && 
-                       isset($context['payload_type']);
-            })
+            $this->callback(
+                fn ($context) => isset($context['exception']) &&
+                       isset($context['model'], $context['payload_type'])
+            )
         );
-        
+
         $this->expectException(ClientException::class);
         $this->expectExceptionMessage('Gemini request failed: API error');
-        
+
         $this->client->request($this->model, $payload, $options);
     }
-    
+
     public function testConstructorWithDefaultLogger(): void
     {
         $apiClient = $this->createMock(GeminiAPIClient::class);
         $client = new GeminiClient($apiClient);
-        
+
         $this->assertInstanceOf(GeminiClient::class, $client);
     }
 
@@ -1019,21 +1068,21 @@ final class GeminiClientTest extends ClientTestCase
     {
         $geminiProvider = $this->createMock(ProviderInterface::class);
         $geminiProvider->method('is')->with(AIProvider::GEMINI)->willReturn(true);
-        
+
         $geminiModel = $this->createMock(ModelInterface::class);
         $geminiModel->method('getProvider')->willReturn($geminiProvider);
-        
+
         $this->assertTrue($this->client->supports($geminiModel));
-        
+
         $nonGeminiProvider = $this->createMock(ProviderInterface::class);
         $nonGeminiProvider->method('is')->with(AIProvider::GEMINI)->willReturn(false);
-        
+
         $nonGeminiModel = $this->createMock(ModelInterface::class);
         $nonGeminiModel->method('getProvider')->willReturn($nonGeminiProvider);
-        
+
         $this->assertFalse($this->client->supports($nonGeminiModel));
     }
-    
+
 
     public function testGetResultConverter(): void
     {
@@ -1041,12 +1090,220 @@ final class GeminiClientTest extends ClientTestCase
         $reflection = new ReflectionClass($this->client);
         $method = $reflection->getMethod('getResultConverter');
         $method->setAccessible(true);
-        
+
         $converter1 = $method->invoke($this->client);
         $converter2 = $method->invoke($this->client);
-        
+
         $this->assertInstanceOf(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class, $converter1);
         $this->assertSame($converter1, $converter2, 'Result converter should be lazy loaded');
     }
 
+    public function testRequestSendsAttachmentsAsInlineDataPartsBeforeText(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', ['maxOutputTokens' => 1000], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
+        $result = $this->createMock(ResultInterface::class);
+        $capturedContents = null;
+        $capturedSystem = null;
+
+        $this->apiClient->method('generativeModel')->with('gemini-1.5-flash')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->method('withSystemInstruction')->willReturnCallback(
+            function (Content $content) use (&$capturedSystem, $generativeModel) {
+                $capturedSystem = $content;
+
+                return $generativeModel;
+            }
+        );
+        $generativeModel->expects($this->once())->method('generateContent')->willReturnCallback(
+            function (...$contents) use (&$capturedContents, $response) {
+                $capturedContents = $contents;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
+        $resultConverter->method('convert')->willReturn($result);
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $this->assertSame($result, $this->client->request($model, $this->attachmentPayload()));
+
+        $this->assertInstanceOf(Content::class, $capturedSystem);
+        $this->assertSame('sys', $capturedSystem->parts[0]->text);
+
+        $this->assertIsArray($capturedContents);
+        $this->assertCount(1, $capturedContents);
+        $content = $capturedContents[0];
+        $this->assertInstanceOf(Content::class, $content);
+        $this->assertSame(Role::USER, $content->role);
+        $this->assertCount(3, $content->parts);
+        $this->assertSame(MimeType::APPLICATION_PDF, $content->parts[0]->inlineData?->mimeType);
+        $this->assertSame(base64_encode('%PDF-1.4 x'), $content->parts[0]->inlineData->data);
+        $this->assertSame(MimeType::IMAGE_PNG, $content->parts[1]->inlineData?->mimeType);
+        $this->assertSame(base64_encode('PNGBYTES'), $content->parts[1]->inlineData->data);
+        $this->assertNull($content->parts[2]->inlineData);
+        $this->assertSame('Extract', $content->parts[2]->text);
+    }
+
+    public function testRequestExpandsAttachmentsInLegacyMessagesPayload(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', ['maxOutputTokens' => 1000], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
+        $capturedContents = null;
+
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->method('withSystemInstruction')->willReturnSelf();
+        $generativeModel->method('generateContent')->willReturnCallback(
+            function (...$contents) use (&$capturedContents, $response) {
+                $capturedContents = $contents;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
+        $resultConverter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $this->client->request($model, ['messages' => $this->attachmentPayload()]);
+
+        $this->assertIsArray($capturedContents);
+        $content = $capturedContents[0];
+        $this->assertInstanceOf(Content::class, $content);
+        $this->assertCount(3, $content->parts);
+        $this->assertSame(MimeType::APPLICATION_PDF, $content->parts[0]->inlineData?->mimeType);
+        $this->assertSame('Extract', $content->parts[2]->text);
+    }
+
+    public function testRequestRejectsGifAttachmentBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('generativeModel');
+
+        $payload = Conversation::fromUser(UserPrompt::create('Describe'))
+            ->withAttachments(Attachment::fromBytes('GIF89a', 'image/gif'))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client->request($this->model, $payload);
+            $this->fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            $this->assertNotInstanceOf(ClientException::class, $e);
+            $this->assertStringContainsString('"image/gif"', $e->getMessage());
+        }
+    }
+
+    public function testRequestSendsTextAttachmentAsDelimitedTextPart(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', ['maxOutputTokens' => 1000], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
+        $capturedContents = null;
+
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->expects($this->once())->method('generateContent')->willReturnCallback(
+            function (...$contents) use (&$capturedContents, $response) {
+                $capturedContents = $contents;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
+        $resultConverter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $payload = Conversation::fromUser(UserPrompt::create('Sum it'))
+            ->withAttachments(Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'), Attachment::fromBytes("a,b\n1,2", 'text/csv'))
+            ->toRequestArray()
+        ;
+        $this->client->request($model, $payload);
+
+        $this->assertIsArray($capturedContents);
+        $content = $capturedContents[0];
+        $this->assertInstanceOf(Content::class, $content);
+        $this->assertCount(3, $content->parts);
+        $this->assertSame(MimeType::APPLICATION_PDF, $content->parts[0]->inlineData?->mimeType);
+        $this->assertNull($content->parts[1]->inlineData);
+        $this->assertSame("<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>", $content->parts[1]->text);
+        $this->assertSame(['text' => "<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>"], $content->parts[1]->toArray());
+        $this->assertSame('Sum it', $content->parts[2]->text);
+    }
+
+    public function testRequestRejectsDocxAttachmentBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('generativeModel');
+
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client->request($this->model, $payload);
+            $this->fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            $this->assertNotInstanceOf(ClientException::class, $e);
+            $this->assertSame(sprintf('Gemini model "%s" does not accept "%s" attachments.', $this->getDefaultModelId(), Attachment::DOCX), $e->getMessage());
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function attachmentPayload(): array
+    {
+        return Conversation::withSystem(UserPrompt::create('Extract'), SystemPrompt::create('sys'))
+            ->withAttachments(Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'), Attachment::fromBytes('PNGBYTES', 'image/png'))
+            ->toRequestArray()
+        ;
+    }
+
+    public function testFailedAttachmentRequestKeepsTheDocumentOutOfLogAndException(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->method('generateContent')->willThrowException(new \RuntimeException('Upstream 500'));
+        $this->logger->expects($this->once())->method('error')->with(
+            'Gemini request with attachments failed',
+            $this->callback(fn (array $context): bool => !isset($context['exception']) && $context['exception_class'] === \RuntimeException::class)
+        );
+
+        try {
+            $this->client->request($model, Conversation::fromUser(UserPrompt::create('Extract'))->withAttachments(Attachment::fromBytes('%PDF-1.4 SECRET', 'application/pdf'))->toRequestArray());
+            $this->fail('Expected ClientException');
+        } catch (ClientException $e) {
+            $this->assertNull($e->getPrevious());
+        }
+    }
+
+    public function testFailedTextRequestStillChainsThePreviousException(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->method('generateContent')->willThrowException($cause = new \RuntimeException('Upstream 500'));
+
+        try {
+            $this->client->request($model, 'Hello');
+            $this->fail('Expected ClientException');
+        } catch (ClientException $e) {
+            $this->assertSame($cause, $e->getPrevious());
+        }
+    }
+
+    public function testNonAttachmentEntryBecomesClientException(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $this->apiClient->expects($this->never())->method('generativeModel');
+
+        $this->expectException(ClientException::class);
+
+        $this->client->request($model, [['role' => 'user', 'content' => 'x', 'attachments' => ['not an attachment']]]);
+    }
 }
