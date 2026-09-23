@@ -106,6 +106,45 @@ final class PlatformAttachmentsTest extends TestCase
         $this->assertStringNotContainsString('john.doe@example.com', $captured[0]['content']);
     }
 
+    public function testTextAttachmentNeedsNoCapability(): void
+    {
+        $csv = Attachment::fromBytes("a,b\n1,2", 'text/csv');
+        $captured = null;
+
+        $client = $this->client(new OpenAIProvider());
+        $client->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function ($model, $payload) use (&$captured) {
+                $captured = $payload;
+
+                return new TextResult('ok');
+            })
+        ;
+
+        $conversation = Conversation::fromUser(UserPrompt::create('Sum the columns'))->withAttachments($csv);
+
+        // gpt-4.1-nano has neither VISION nor DOCUMENT
+        (new Platform([$client]))->ask($conversation, 'gpt-4.1-nano');
+
+        $this->assertIsArray($captured);
+        $this->assertSame([$csv], $captured[0]['attachments']);
+    }
+
+    public function testDocxOnModelWithoutDocumentCapabilityIsRejectedBeforeClientCall(): void
+    {
+        $client = $this->client(new OpenAIProvider());
+        $client->expects($this->never())->method('request');
+
+        $conversation = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+        ;
+
+        $this->expectException(UnsupportedCapabilityException::class);
+        $this->expectExceptionMessage('document');
+
+        (new Platform([$client]))->ask($conversation, 'gpt-4-turbo');
+    }
+
     public function testTextOnlyRequestSendsLegacyPayload(): void
     {
         $conversation = Conversation::withSystem(UserPrompt::create('Hello'), SystemPrompt::create('Be brief'));

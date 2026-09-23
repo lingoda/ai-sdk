@@ -47,13 +47,17 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface
     {
         $hasAttachments = $this->hasAttachments($payload);
-        $expanded = $this->expandAttachments($payload, static fn (Attachment $attachment, int $position): array => $attachment->isImage()
-            ? ['type' => 'image_url', 'image_url' => ['url' => sprintf('data:%s;base64,%s', $attachment->mimeType, base64_encode($attachment->bytes()))]]
-            // Chat Completions requires a filename: a generated one, never the user's
-            : ['type' => 'file', 'file' => [
+        $modelId = $model->getId();
+        $expanded = $this->expandAttachments($payload, fn (Attachment $attachment, int $position): array => match (true) {
+            $attachment->isImage() => ['type' => 'image_url', 'image_url' => ['url' => sprintf('data:%s;base64,%s', $attachment->mimeType, base64_encode($attachment->bytes()))]],
+            $attachment->isText() => ['type' => 'text', 'text' => $this->attachmentText($attachment, $position)],
+            // Chat Completions takes PDF files only, with a filename: a generated one, never the user's
+            $attachment->mimeType === Attachment::PDF => ['type' => 'file', 'file' => [
                 'filename' => sprintf('document-%d.pdf', $position),
                 'file_data' => 'data:application/pdf;base64,' . base64_encode($attachment->bytes()),
-            ]]);
+            ]],
+            default => throw $this->unsupportedAttachment('OpenAI', $modelId, $attachment),
+        });
 
         try {
             $requestPayload = $this->buildChatPayload($model, $expanded, $options);

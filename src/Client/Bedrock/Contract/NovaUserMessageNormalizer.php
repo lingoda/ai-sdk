@@ -23,6 +23,11 @@ use Symfony\AI\Platform\Model;
  */
 final class NovaUserMessageNormalizer extends ModelContractNormalizer
 {
+    private const array DOCUMENT_FORMATS = [
+        'application/pdf' => 'pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+    ];
+
     /**
      * @param UserMessage $data
      * @param array<string, mixed> $context
@@ -49,11 +54,11 @@ final class NovaUserMessageNormalizer extends ModelContractNormalizer
                     'format' => str_replace('jpg', 'jpeg', str_replace('image/', '', $value->getFormat())),
                     'source' => ['bytes' => $value->asBase64()],
                 ]];
-            } elseif ($value instanceof Document && $value->getFormat() === 'application/pdf') {
+            } elseif ($value instanceof Document && isset(self::DOCUMENT_FORMATS[$value->getFormat()])) {
                 $content[] = ['document' => [
-                    'format' => 'pdf',
-                    // Generated name, never the user's filename
-                    'name' => 'document-' . ++$documentIndex,
+                    'format' => self::DOCUMENT_FORMATS[$value->getFormat()],
+                    // Generated name (document-N by position, set by BedrockClient), never the user's filename
+                    'name' => $value->getFilename() ?? 'document-' . ++$documentIndex,
                     'source' => ['bytes' => $value->asBase64()],
                 ]];
             } else {

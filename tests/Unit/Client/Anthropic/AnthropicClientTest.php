@@ -13,6 +13,7 @@ use Lingoda\AiSdk\Converter\Anthropic\AnthropicResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
 use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Prompt\Conversation;
 use Lingoda\AiSdk\Prompt\SystemPrompt;
@@ -413,6 +414,58 @@ final class AnthropicClientTest extends ClientTestCase
                 ['type' => 'text', 'text' => 'Extract'],
             ]],
         ], $captured['messages']);
+    }
+
+    public function testRequestSendsTextAttachmentAsTextDocument(): void
+    {
+        $captured = null;
+        $messagesResource = $this->createMock(Messages::class);
+        $response = $this->createMock(CreateResponse::class);
+
+        $this->apiClient->method('messages')->willReturn($messagesResource);
+        $messagesResource->expects($this->once())->method('create')->willReturnCallback(
+            function (array $parameters) use (&$captured, $response): CreateResponse {
+                $captured = $parameters;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(AnthropicResultConverter::class);
+        $resultConverter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $payload = Conversation::fromUser(UserPrompt::create('Sum it'))
+            ->withAttachments(Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'), Attachment::fromBytes("a,b\n1,2", 'text/csv'))
+            ->toRequestArray()
+        ;
+        $this->client->request($this->model, $payload);
+
+        $this->assertIsArray($captured);
+        $this->assertSame([
+            ['role' => 'user', 'content' => [
+                ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode('%PDF-1.4 x')]],
+                ['type' => 'document', 'title' => 'document-2', 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => "a,b\n1,2"]],
+                ['type' => 'text', 'text' => 'Sum it'],
+            ]],
+        ], $captured['messages']);
+    }
+
+    public function testRequestRejectsDocxBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('messages');
+
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client->request($this->model, $payload);
+            $this->fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            $this->assertNotInstanceOf(ClientException::class, $e);
+            $this->assertStringContainsString(sprintf('Anthropic model "%s" does not accept "%s" attachments.', $this->getDefaultModelId(), Attachment::DOCX), $e->getMessage());
+        }
     }
 
     public function testRequestRejectsNonAttachmentBeforeCallingApi(): void

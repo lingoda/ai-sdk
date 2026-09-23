@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk\Client\Bedrock;
 
 use AsyncAws\Core\Exception\Http\HttpException;
+use Lingoda\AiSdk\Client\AttachmentBlocksTrait;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Enum\Bedrock\ApiFormat;
@@ -29,6 +30,7 @@ use Symfony\AI\Platform\Bridge\Bedrock\RegionMapper;
 use Symfony\AI\Platform\Message\Content\ContentInterface;
 use Symfony\AI\Platform\Message\Content\Document;
 use Symfony\AI\Platform\Message\Content\Image;
+use Symfony\AI\Platform\Message\Content\Text;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 use Symfony\AI\Platform\PlatformInterface as SymfonyPlatformInterface;
@@ -44,6 +46,8 @@ use Symfony\AI\Platform\Result\ToolCallResult as SymfonyToolCallResult;
  */
 final class BedrockClient implements ClientInterface
 {
+    use AttachmentBlocksTrait;
+
     private const array REGION_PREFIXES = ['eu', 'us'];
     private const array OPTIONS = ['temperature', 'max_tokens'];
 
@@ -94,13 +98,17 @@ final class BedrockClient implements ClientInterface
 
         try {
             $deferred = $platform->invoke($chatModel->catalogName(), $messages, $this->filterOptions($model, $chatModel, $options));
-            $result = $deferred->getResult();
             $data = $deferred->getRawResult()->getData();
+            $stopReason = $data['stop_reason'] ?? $data['stopReason'] ?? null;
+            if ($stopReason === 'refusal') {
+                throw new ClientException('The model refused the request (stop_reason: refusal).');
+            }
+            $result = $deferred->getResult();
 
             $metadata = [
                 'model' => $this->regionPrefix . '.' . $chatModel->value,
                 'provider' => AIProvider::BEDROCK->value,
-                'stop_reason' => $data['stop_reason'] ?? $data['stopReason'] ?? null,
+                'stop_reason' => $stopReason,
             ];
 
             return $this->convertResult($result, $metadata)->withUsage($this->extractUsage($chatModel, $data));
@@ -151,7 +159,7 @@ final class BedrockClient implements ClientInterface
                     break;
                 case 'user':
                     // Documents before the text
-                    $bag->add(Message::ofUser(...[...$this->toContent($message['attachments'] ?? []), $message['content']]));
+                    $bag->add(Message::ofUser(...[...$this->toContent($message['attachments'] ?? [], $chatModel), $message['content']]));
                     $hasUser = true;
                     break;
                 default:
@@ -168,24 +176,29 @@ final class BedrockClient implements ClientInterface
 
     /**
      * @throws ClientException
+     * @throws UnsupportedCapabilityException for a document type the model does not read
      *
      * @return list<ContentInterface>
      */
-    private function toContent(mixed $attachments): array
+    private function toContent(mixed $attachments, ChatModel $chatModel): array
     {
         if (!is_array($attachments)) {
             throw new ClientException('Attachments must be a list of Attachment objects.');
         }
 
         $content = [];
-        foreach ($attachments as $attachment) {
+        foreach (array_values($attachments) as $index => $attachment) {
             if (!$attachment instanceof Attachment) {
                 throw new ClientException('Attachments must be a list of Attachment objects.');
             }
 
-            $content[] = $attachment->isImage()
-                ? new Image($attachment->bytes(), $attachment->mimeType)
-                : new Document($attachment->bytes(), $attachment->mimeType);
+            $content[] = match (true) {
+                $attachment->isImage() => new Image($attachment->bytes(), $attachment->mimeType),
+                $attachment->isText() => new Text($this->attachmentText($attachment, $index + 1)),
+                // The path only carries the generated name (document-N) to the Nova normalizer
+                $chatModel->acceptsDocument($attachment->mimeType) => new Document($attachment->bytes(), $attachment->mimeType, sprintf('document-%d', $index + 1)),
+                default => throw $this->unsupportedAttachment('Bedrock', $chatModel->value, $attachment),
+            };
         }
 
         return $content;
@@ -220,6 +233,9 @@ final class BedrockClient implements ClientInterface
     {
         $merged = array_merge($model->getOptions(), $options);
         $allowed = $chatModel->supportsResponseFormat() ? [...self::OPTIONS, 'response_format'] : self::OPTIONS;
+        if (!$chatModel->supportsTemperature()) {
+            $allowed = array_values(array_diff($allowed, ['temperature']));
+        }
 
         $dropped = array_values(array_diff(array_keys($merged), $allowed));
         if ($dropped !== []) {
@@ -255,7 +271,8 @@ final class BedrockClient implements ClientInterface
             ));
         }
 
-        throw new ClientException(sprintf('Unsupported Bedrock result type "%s".', $result::class));
+        // e.g. only a thinking block, when max_tokens ran out before any text
+        throw new ClientException(sprintf('No text in the Bedrock response (stop_reason: %s).', is_string($metadata['stop_reason'] ?? null) ? $metadata['stop_reason'] : 'unknown'));
     }
 
     /**

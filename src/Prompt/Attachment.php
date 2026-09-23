@@ -13,7 +13,12 @@ use Lingoda\AiSdk\Exception\InvalidArgumentException;
  */
 final class Attachment
 {
-    public const array MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    public const string PDF = 'application/pdf';
+    public const string DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    public const array IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    /** Sent to the model as text, so every provider can read them */
+    public const array TEXT_TYPES = ['text/plain', 'text/csv', 'text/markdown', 'text/html', 'application/json'];
+    public const array MIME_TYPES = [self::PDF, self::DOCX, ...self::IMAGE_TYPES, ...self::TEXT_TYPES];
 
     public const int MAX_BYTES = 15 * 1024 * 1024;
 
@@ -51,6 +56,10 @@ final class Attachment
             ));
         }
 
+        if (in_array($mimeType, self::TEXT_TYPES, true) && !mb_check_encoding($bytes, 'UTF-8')) {
+            throw new InvalidArgumentException(sprintf('Text attachment "%s" must be valid UTF-8.', $mimeType));
+        }
+
         $this->sha256 = hash('sha256', $bytes);
         self::$bytes ??= new \WeakMap();
         self::$bytes[$this] = $bytes;
@@ -80,7 +89,15 @@ final class Attachment
 
     public function isImage(): bool
     {
-        return str_starts_with($this->mimeType, 'image/');
+        return in_array($this->mimeType, self::IMAGE_TYPES, true);
+    }
+
+    /**
+     * Text formats (plain text, CSV, Markdown, HTML, JSON): clients send the content as text.
+     */
+    public function isText(): bool
+    {
+        return in_array($this->mimeType, self::TEXT_TYPES, true);
     }
 
     public function size(): int

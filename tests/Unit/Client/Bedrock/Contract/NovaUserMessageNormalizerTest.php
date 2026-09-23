@@ -64,6 +64,23 @@ final class NovaUserMessageNormalizerTest extends TestCase
         ], $normalized);
     }
 
+    public function testDocxBecomesDocumentBlockNumberedWithPdfs(): void
+    {
+        $docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        $normalized = (new NovaUserMessageNormalizer())->normalize(
+            Message::ofUser(new Document('PDF-ONE', 'application/pdf'), new Document('DOCX-ONE', $docx), 'Extract')
+        );
+
+        self::assertSame([
+            'role' => 'user',
+            'content' => [
+                ['document' => ['format' => 'pdf', 'name' => 'document-1', 'source' => ['bytes' => base64_encode('PDF-ONE')]]],
+                ['document' => ['format' => 'docx', 'name' => 'document-2', 'source' => ['bytes' => base64_encode('DOCX-ONE')]]],
+                ['text' => 'Extract'],
+            ],
+        ], $normalized);
+    }
+
     public function testNonPdfDocumentIsRejected(): void
     {
         $this->expectException(RuntimeException::class);

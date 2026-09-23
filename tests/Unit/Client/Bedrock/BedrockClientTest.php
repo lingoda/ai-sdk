@@ -146,6 +146,65 @@ final class BedrockClientTest extends TestCase
         );
     }
 
+    public function testTextAttachmentIsSentAsTextOnBothModels(): void
+    {
+        $this->responses = [$this->claudeResponse('a'), $this->novaResponse('b')];
+        $client = $this->client();
+        $payload = Conversation::fromUser(UserPrompt::create('Sum it'))
+            ->withAttachments(Attachment::fromBytes("a,b\n1,2", 'text/csv'))
+            ->toRequestArray()
+        ;
+        $rendered = "<document-aeedab1ee7a1 name=\"document-1\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>";
+
+        $client->request($this->model(ChatModel::CLAUDE_HAIKU_45), $payload);
+        $client->request($this->model(ChatModel::NOVA_2_LITE), $payload);
+
+        self::assertSame(
+            [['role' => 'user', 'content' => [['type' => 'text', 'text' => $rendered], ['type' => 'text', 'text' => 'Sum it']]]],
+            $this->requests[0]['body']['messages']
+        );
+        self::assertSame(
+            [['role' => 'user', 'content' => [['text' => $rendered], ['text' => 'Sum it']]]],
+            $this->requests[1]['body']['messages']
+        );
+    }
+
+    public function testNovaSendsDocxAsDocxDocumentBlock(): void
+    {
+        $this->responses[] = $this->novaResponse('ok');
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        $this->client()->request($this->model(ChatModel::NOVA_2_LITE), $payload);
+
+        self::assertSame(
+            ['document' => ['format' => 'docx', 'name' => 'document-1', 'source' => ['bytes' => base64_encode('PK docx')]]],
+            $this->firstUserPart($this->requests[0])
+        );
+    }
+
+    public function testClaudeRejectsDocxBeforeAnyHttpRequest(): void
+    {
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), $payload);
+            self::fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            self::assertSame(
+                sprintf('Bedrock model "%s" does not accept "%s" attachments.', ChatModel::CLAUDE_HAIKU_45->value, Attachment::DOCX),
+                $e->getMessage()
+            );
+        }
+
+        self::assertSame([], $this->requests);
+    }
+
     public function testUsageAndMetadataAreSet(): void
     {
         $this->responses = [$this->claudeResponse('a'), $this->novaResponse('b')];
@@ -333,12 +392,22 @@ final class BedrockClientTest extends TestCase
         self::assertSame('tool_use', $result->getMetadata()['stop_reason']);
     }
 
-    public function testUnsupportedResultTypeBecomesClientException(): void
+    public function testThinkingOnlyResponseReportsTheStopReason(): void
     {
-        $this->responses[] = $this->claudeBody(['content' => [['type' => 'thinking', 'thinking' => 'hmm', 'signature' => 's']]]);
+        $this->responses[] = $this->claudeBody(['content' => [['type' => 'thinking', 'thinking' => 'hmm', 'signature' => 's']], 'stop_reason' => 'max_tokens']);
 
         $this->expectException(ClientException::class);
-        $this->expectExceptionMessage('Unsupported Bedrock result type');
+        $this->expectExceptionMessage('No text in the Bedrock response (stop_reason: max_tokens)');
+
+        $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), 'Hi');
+    }
+
+    public function testRefusalIsReportedAsSuch(): void
+    {
+        $this->responses[] = $this->claudeBody(['content' => [], 'stop_reason' => 'refusal']);
+
+        $this->expectException(ClientException::class);
+        $this->expectExceptionMessage('The model refused the request (stop_reason: refusal)');
 
         $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), 'Hi');
     }
@@ -348,6 +417,23 @@ final class BedrockClientTest extends TestCase
         $this->responses[] = $this->claudeBody(['content' => [['type' => 'text', 'text' => 'ok']]]);
 
         self::assertNull($this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), 'Hi')->getUsage());
+    }
+
+    public function testNovaDocumentNamesFollowAttachmentPositions(): void
+    {
+        $this->responses[] = $this->novaResponse('ok');
+        $payload = Conversation::fromUser(UserPrompt::create('Read'))
+            ->withAttachments(Attachment::fromBytes('a,b', 'text/csv'), Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'))
+            ->toRequestArray()
+        ;
+
+        $this->client()->request($this->model(ChatModel::NOVA_2_LITE), $payload);
+
+        /** @var list<array{content: list<array<string, mixed>>}> $messages */
+        $messages = $this->requests[0]['body']['messages'];
+        $parts = $messages[0]['content'];
+        self::assertStringContainsString('name="document-1"', (string) ($parts[0]['text'] ?? ''));
+        self::assertSame('document-2', $parts[1]['document']['name'] ?? null);
     }
 
     public function testRegionOutsideEuAndUsIsRejected(): void

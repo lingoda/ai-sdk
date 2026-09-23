@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk\Client;
 
 use Lingoda\AiSdk\Exception\ClientException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
 use Lingoda\AiSdk\Prompt\Attachment;
 use Psr\Log\LoggerInterface;
 
@@ -91,5 +92,21 @@ trait AttachmentBlocksTrait
         ]);
 
         return new ClientException(sprintf('%s request failed: %s', $provider, mb_substr($message, 0, 500)));
+    }
+
+    /**
+     * A text attachment as a delimited text block, for providers that take it as part of the prompt.
+     * The tag comes from the content's hash, so the content cannot contain its own closing tag.
+     */
+    private function attachmentText(Attachment $attachment, int $position): string
+    {
+        $tag = 'document-' . mb_substr($attachment->sha256, 0, 12);
+
+        return sprintf("<%s name=\"document-%d\" type=\"%s\">\n%s\n</%s>", $tag, $position, $attachment->mimeType, $attachment->bytes(), $tag);
+    }
+
+    private function unsupportedAttachment(string $provider, string $modelId, Attachment $attachment): UnsupportedCapabilityException
+    {
+        return new UnsupportedCapabilityException(sprintf('%s model "%s" does not accept "%s" attachments.', $provider, $modelId, $attachment->mimeType));
     }
 }

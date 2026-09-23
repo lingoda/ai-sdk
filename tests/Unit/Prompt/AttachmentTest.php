@@ -25,6 +25,12 @@ final class AttachmentTest extends TestCase
         yield 'png' => ['image/png'];
         yield 'gif' => ['image/gif'];
         yield 'webp' => ['image/webp'];
+        yield 'docx' => [Attachment::DOCX];
+        yield 'plain text' => ['text/plain'];
+        yield 'csv' => ['text/csv'];
+        yield 'markdown' => ['text/markdown'];
+        yield 'html' => ['text/html'];
+        yield 'json' => ['application/json'];
     }
 
     #[DataProvider('allowedMimeTypes')]
@@ -38,9 +44,9 @@ final class AttachmentTest extends TestCase
     public function testRejectsUnsupportedMimeType(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unsupported attachment type "text/plain"');
+        $this->expectExceptionMessage('Unsupported attachment type "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"');
 
-        Attachment::fromBytes('hello', 'text/plain');
+        Attachment::fromBytes('hello', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
 
     public function testRejectsDetectedUnsupportedMimeType(): void
@@ -48,7 +54,8 @@ final class AttachmentTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Unsupported attachment type');
 
-        Attachment::fromBytes('just some plain text');
+        // Undetectable binary: detected as application/octet-stream, which is not allowed
+        Attachment::fromBytes("PK\x03\x04" . str_repeat("\x00", 26) . 'content');
     }
 
     public function testRejectsEmptyBytes(): void
@@ -124,6 +131,73 @@ final class AttachmentTest extends TestCase
         $this->assertFalse(Attachment::fromBytes('x', 'application/pdf')->isImage());
     }
 
+    /**
+     * @return iterable<string, array{string, bool, bool}>
+     */
+    public static function typeClassification(): iterable
+    {
+        yield 'pdf' => [Attachment::PDF, false, false];
+        yield 'docx' => [Attachment::DOCX, false, false];
+        yield 'jpeg' => ['image/jpeg', true, false];
+        yield 'png' => ['image/png', true, false];
+        yield 'gif' => ['image/gif', true, false];
+        yield 'webp' => ['image/webp', true, false];
+        yield 'plain text' => ['text/plain', false, true];
+        yield 'csv' => ['text/csv', false, true];
+        yield 'markdown' => ['text/markdown', false, true];
+        yield 'html' => ['text/html', false, true];
+        yield 'json' => ['application/json', false, true];
+    }
+
+    #[DataProvider('typeClassification')]
+    public function testIsImageAndIsTextPerType(string $mimeType, bool $isImage, bool $isText): void
+    {
+        $attachment = Attachment::fromBytes('x', $mimeType);
+
+        $this->assertSame($isImage, $attachment->isImage());
+        $this->assertSame($isText, $attachment->isText());
+    }
+
+    public function testMimeTypesListsEveryType(): void
+    {
+        $this->assertSame(
+            [Attachment::PDF, Attachment::DOCX, ...Attachment::IMAGE_TYPES, ...Attachment::TEXT_TYPES],
+            Attachment::MIME_TYPES
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function textMimeTypes(): iterable
+    {
+        foreach (Attachment::TEXT_TYPES as $mimeType) {
+            yield $mimeType => [$mimeType];
+        }
+    }
+
+    #[DataProvider('textMimeTypes')]
+    public function testRejectsInvalidUtf8Text(string $mimeType): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Text attachment "%s" must be valid UTF-8.', $mimeType));
+
+        Attachment::fromBytes("a,b\n\xC3\x28", $mimeType);
+    }
+
+    public function testAcceptsMultibyteUtf8Text(): void
+    {
+        $attachment = Attachment::fromBytes("name,city\nJos\u{00E9},M\u{00FC}nchen", 'text/csv');
+
+        $this->assertSame("name,city\nJos\u{00E9},M\u{00FC}nchen", $attachment->bytes());
+    }
+
+    public function testInvalidUtf8IsAllowedForBinaryTypes(): void
+    {
+        $this->assertSame(Attachment::PDF, Attachment::fromBytes("%PDF-1.4 \xC3\x28\xFF", Attachment::PDF)->mimeType);
+        $this->assertSame(Attachment::DOCX, Attachment::fromBytes("PK\x03\x04\xFF", Attachment::DOCX)->mimeType);
+    }
+
     public function testDebugOutputDoesNotContainBytes(): void
     {
         $attachment = Attachment::fromBytes('%PDF-1.4 ' . self::MARKER, 'application/pdf');
@@ -150,7 +224,7 @@ final class AttachmentTest extends TestCase
     public function testBytesAreRedactedFromExceptionTraces(): void
     {
         try {
-            Attachment::fromBytes('SECRET-TRACE-MARKER', 'text/plain');
+            Attachment::fromBytes('SECRET-TRACE-MARKER', 'application/zip');
             $this->fail('Expected InvalidArgumentException');
         } catch (\Lingoda\AiSdk\Exception\InvalidArgumentException $e) {
             foreach ($e->getTrace() as $frame) {

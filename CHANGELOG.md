@@ -3,10 +3,10 @@
 ## 2.0.0 (unreleased)
 
 ### Added
-- Attachments: `Attachment` value object (PDF, JPEG, PNG, GIF, WebP, 15 MB guard), `UserPrompt::withAttachments()`, `Conversation::withAttachments()`.
+- Attachments: `Attachment` value object (PDF, DOCX, text formats TXT/CSV/Markdown/HTML/JSON, JPEG, PNG, GIF, WebP; 15 MB guard), `UserPrompt::withAttachments()`, `Conversation::withAttachments()`. Text formats are sent as text, so every model reads them; DOCX is read by Bedrock Nova only.
 - `Capability::DOCUMENT` for PDF input. `Platform` validates attachments against the model before any client call.
-- Attachments on every chat provider: OpenAI (`file` / `image_url` parts; gpt-5, gpt-4.1, gpt-4.1-mini, gpt-4o), Anthropic (`document` / `image` blocks; all Claude models except Claude 3 Haiku), Gemini (inline data; 2.5 and 3.1, no GIF) and Bedrock.
-- AWS Bedrock provider (`AIProvider::BEDROCK`): Nova 2 Lite and Claude Haiku 4.5, text, images and PDFs, via the optional `symfony/ai-bedrock-platform` ~0.13.0. Nova rejects conversations with an assistant prompt (it requires the user turn first); Claude accepts them. Nova PDF support through our own normalizer (upstream lacks it).
+- Attachments on every chat provider: OpenAI (PDF, images, text; gpt-5, gpt-4.1, gpt-4.1-mini, gpt-4o), Anthropic (PDF, images, text; all Claude models except Claude 3 Haiku), Gemini (PDF, images except GIF, text; 2.5 and 3.1) and Bedrock (Nova: also DOCX).
+- AWS Bedrock provider (`AIProvider::BEDROCK`): Amazon Nova (Micro, Lite, Pro, 2 Lite) and Claude (Haiku 4.5, Sonnet 4.5, Opus 4.5, Sonnet 4.6, Opus 4.6, Opus 4.7, Opus 4.8, Sonnet 5, Opus 5, Opus 5.5), text, images, PDFs (Nova also DOCX), via the optional `symfony/ai-bedrock-platform` ~0.13.0. Nova rejects conversations with an assistant prompt (it requires the user turn first); Claude accepts them. Nova PDF support through our own normalizer (upstream lacks it).
 - TypeSafe Jev decisions: `DecisionPlatformInterface`, `Question`, `Answer`, `DecisionResult`, `TypeSafeDecisionPlatform`. Jev is a provider (`AIProvider::TYPESAFE`, `TypeSafeProvider`, `Enum\TypeSafe\DecisionModel`) exposed through `DecisionPlatformInterface::getProvider()`, never through `Platform::ask()`.
 - `RateLimitedClient` option `retryTransportErrors` (default `true`).
 

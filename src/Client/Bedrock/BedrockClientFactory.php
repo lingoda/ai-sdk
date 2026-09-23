@@ -10,7 +10,9 @@ use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\RuntimeException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\AI\Platform\Bridge\Anthropic\Claude;
 use Symfony\AI\Platform\Bridge\Bedrock\Factory;
+use Symfony\AI\Platform\Bridge\Bedrock\ModelCatalog;
 use Symfony\AI\Platform\Bridge\Bedrock\Nova\Contract\AssistantMessageNormalizer;
 use Symfony\AI\Platform\Bridge\Bedrock\Nova\Contract\MessageBagNormalizer;
 use Symfony\AI\Platform\Bridge\Bedrock\Nova\Contract\ToolCallMessageNormalizer;
@@ -45,7 +47,7 @@ final class BedrockClientFactory
         }
 
         // One platform per API format; the Converse one uses our Nova normalizer for PDF support
-        $anthropicMessagesPlatform = Factory::createPlatform($runtimeClient);
+        $anthropicMessagesPlatform = Factory::createPlatform($runtimeClient, self::modelCatalog());
         $conversePlatform = Factory::createPlatform($runtimeClient, contract: Contract::create([
             new NovaUserMessageNormalizer(),
             new AssistantMessageNormalizer(),
@@ -60,5 +62,15 @@ final class BedrockClientFactory
             (string) $runtimeClient->getConfiguration()->get('region'),
             $logger,
         );
+    }
+
+    /**
+     * Symfony AI's catalog plus the Claude models it does not list yet. Routing only needs the class.
+     */
+    private static function modelCatalog(): ModelCatalog
+    {
+        $claude = ['class' => Claude::class, 'capabilities' => []];
+
+        return new ModelCatalog(['claude-opus-5' => $claude, 'claude-opus-5-5' => $claude]);
     }
 }

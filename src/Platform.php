@@ -311,6 +311,9 @@ final readonly class Platform implements PlatformInterface
 
         $required = [];
         foreach ($attachments as $attachment) {
+            if ($attachment->isText()) {
+                continue; // sent as text: every model reads it
+            }
             $capability = $attachment->isImage() ? Capability::VISION : Capability::DOCUMENT;
             $required[$capability->value] = $capability;
         }

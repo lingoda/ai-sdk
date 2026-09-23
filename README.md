@@ -121,9 +121,18 @@ $conversation = Conversation::fromUser(UserPrompt::create('Extract the voucher f
 
 $result = $platform->ask($conversation, 'amazon.nova-2-lite-v1:0');
 ```
-- Allowed types: PDF, JPEG, PNG, GIF, WebP, up to `Attachment::MAX_BYTES` (15 MB). The mime type is detected when omitted (needs ext-fileinfo).
-- PDFs need a model with `Capability::DOCUMENT`, images one with `Capability::VISION`. Otherwise `ask()` throws `UnsupportedCapabilityException` before any request.
-- Supported by every chat provider: OpenAI (gpt-4o and later), Anthropic (Claude 3.5 and later), Gemini (2.5 and later; no GIF images) and Bedrock. Each client converts attachments to its own API format, documents before the text.
+- Up to `Attachment::MAX_BYTES` (15 MB). The mime type is detected when omitted; passing it explicitly is more reliable for text formats.
+- Unsupported combinations throw `UnsupportedCapabilityException` before any request.
+
+| Type | OpenAI | Anthropic | Gemini | Bedrock Nova | Bedrock Claude | Needs |
+|---|---|---|---|---|---|---|
+| PDF | yes | yes | yes | yes | yes | `Capability::DOCUMENT` |
+| DOCX | no | no | no | yes | no | `Capability::DOCUMENT` |
+| Text: TXT, CSV, Markdown, HTML, JSON (UTF-8) | yes | yes | yes | yes | yes | nothing: sent as text |
+| JPEG, PNG, WebP | yes | yes | yes | yes | yes | `Capability::VISION` |
+| GIF | yes | yes | no | yes | yes | `Capability::VISION` |
+
+Attachments come before the text of the user message.
 - `Conversation::toArray()` (what tracing sees) carries only `mime` and `size`, never the bytes. There is no filename on purpose.
 
 ### AWS Bedrock (optional)
@@ -143,7 +152,8 @@ $platform->ask($conversation, 'anthropic.claude-haiku-4-5-20251001-v1:0');   // 
 ```
 - Models are addressed by their Bedrock base id and sent through the region's cross-region inference profile (`eu.` or `us.`), which also ends up in `metadata.model`. Keeping data in the EU is up to you: pick an `eu-` region.
 - Nova needs the conversation to open with the user message: an assistant prompt before it throws `UnsupportedCapabilityException`. Claude accepts it.
-- Only `temperature`, `max_tokens` (default 4096) and, for Claude, `response_format` are passed on; other options are dropped.
+- Only `temperature`, `max_tokens` (default 4096) and `response_format` are passed on; other options are dropped. `response_format` works on Claude Haiku 4.5, Sonnet 4.5/4.6 and Opus 4.5/4.6 and is rejected elsewhere. Claude Opus 4.7+, Sonnet 5 and Opus 5.x do not take a temperature, so it is dropped for them.
+- Claude Opus 5.x thinks before answering: give it enough `max_tokens`, or the response has no text.
 - Errors become `ClientException` with the HTTP status as code, without the previous exception and without the payload, so documents cannot leak into logs or Sentry. Never enable async-aws `debug` in production: it logs the full request body, document included.
 - The runtime client needs an explicit region (config, `AWS_REGION` or `~/.aws/config`); the silent `us-east-1` fallback is refused, and only `eu-` and `us-` regions are accepted.
 - Wrap it in `RateLimitedClient` with `retryTransportErrors: false`, so async-aws stays the only transport retry layer.
@@ -221,9 +231,9 @@ composer require lingoda/ai-sdk
 - Gemini 3.1: `gemini-3.1-flash-lite` (1M context)
 - Gemini 2.5: `gemini-2.5-pro`, `gemini-2.5-flash` (1M context)
 
-**AWS Bedrock Models** (optional, text, images and PDFs):
-- Amazon Nova 2 Lite: `amazon.nova-2-lite-v1:0` (default)
-- Claude Haiku 4.5: `anthropic.claude-haiku-4-5-20251001-v1:0`
+**AWS Bedrock Models** (optional; ids are Bedrock base ids, sent through the region's `eu.`/`us.` inference profile):
+- Amazon Nova: `amazon.nova-2-lite-v1:0` (default), `amazon.nova-pro-v1:0`, `amazon.nova-lite-v1:0`, `amazon.nova-micro-v1:0` (text only)
+- Claude: `anthropic.claude-haiku-4-5-20251001-v1:0`, `anthropic.claude-sonnet-4-5-20250929-v1:0`, `anthropic.claude-opus-4-5-20251101-v1:0`, `anthropic.claude-sonnet-4-6`, `anthropic.claude-opus-4-6-v1`, `anthropic.claude-opus-4-7`, `anthropic.claude-opus-4-8`, `anthropic.claude-sonnet-5`, `anthropic.claude-opus-5`, `anthropic.claude-opus-5-5`
 
 **TypeSafe Jev** (decisions, not chat, text only): `jev-1.13.0` (default), `jev-latest`, `jev-preview`
 

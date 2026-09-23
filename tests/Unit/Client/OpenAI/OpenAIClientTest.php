@@ -14,6 +14,7 @@ use Lingoda\AiSdk\Enum\OpenAI\AudioSpeechFormat;
 use Lingoda\AiSdk\Enum\OpenAI\AudioTranscribeModel;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
 use Lingoda\AiSdk\ModelInterface;
 use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Prompt\Conversation;
@@ -611,6 +612,56 @@ final class OpenAIClientTest extends ClientTestCase
         $this->expectExceptionMessage('Attachments must be a list of Attachment objects.');
 
         $this->client->request($this->model, [['role' => 'user', 'content' => 'x', 'attachments' => ['not-an-attachment']]]);
+    }
+
+    public function testRequestSendsTextAttachmentAsDelimitedTextPart(): void
+    {
+        $captured = null;
+        $chatResource = $this->createMock(Chat::class);
+        $response = $this->createMock(CreateResponse::class);
+
+        $this->apiClient->method('chat')->willReturn($chatResource);
+        $chatResource->expects($this->once())->method('create')->willReturnCallback(
+            function (array $parameters) use (&$captured, $response): CreateResponse {
+                $captured = $parameters;
+
+                return $response;
+            }
+        );
+        $this->injectResultConverter($response, $this->createMock(ResultInterface::class));
+
+        $payload = Conversation::fromUser(UserPrompt::create('Sum it'))
+            ->withAttachments(Attachment::fromBytes('PNGBYTES', 'image/png'), Attachment::fromBytes("a,b\n1,2", 'text/csv'))
+            ->toRequestArray()
+        ;
+        $this->client->request($this->model, $payload);
+
+        $this->assertIsArray($captured);
+        $this->assertSame([
+            ['role' => 'user', 'content' => [
+                ['type' => 'image_url', 'image_url' => ['url' => 'data:image/png;base64,' . base64_encode('PNGBYTES')]],
+                ['type' => 'text', 'text' => "<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>"],
+                ['type' => 'text', 'text' => 'Sum it'],
+            ]],
+        ], $captured['messages']);
+    }
+
+    public function testRequestRejectsDocxBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('chat');
+
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client->request($this->model, $payload);
+            $this->fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            $this->assertNotInstanceOf(ClientException::class, $e);
+            $this->assertSame(sprintf('OpenAI model "gpt-4" does not accept "%s" attachments.', Attachment::DOCX), $e->getMessage());
+        }
     }
 
     private function openAIClient(): OpenAIClient

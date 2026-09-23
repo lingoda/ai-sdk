@@ -1195,6 +1195,61 @@ final class GeminiClientTest extends ClientTestCase
         }
     }
 
+    public function testRequestSendsTextAttachmentAsDelimitedTextPart(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', ['maxOutputTokens' => 1000], 4096);
+        $generativeModel = $this->createMock(\Gemini\Resources\GenerativeModel::class);
+        $response = $this->createMock(\Gemini\Responses\GenerativeModel\GenerateContentResponse::class);
+        $capturedContents = null;
+
+        $this->apiClient->method('generativeModel')->willReturn($generativeModel);
+        $generativeModel->method('withGenerationConfig')->willReturnSelf();
+        $generativeModel->expects($this->once())->method('generateContent')->willReturnCallback(
+            function (...$contents) use (&$capturedContents, $response) {
+                $capturedContents = $contents;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(\Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter::class);
+        $resultConverter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $payload = Conversation::fromUser(UserPrompt::create('Sum it'))
+            ->withAttachments(Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'), Attachment::fromBytes("a,b\n1,2", 'text/csv'))
+            ->toRequestArray()
+        ;
+        $this->client->request($model, $payload);
+
+        $this->assertIsArray($capturedContents);
+        $content = $capturedContents[0];
+        $this->assertInstanceOf(Content::class, $content);
+        $this->assertCount(3, $content->parts);
+        $this->assertSame(MimeType::APPLICATION_PDF, $content->parts[0]->inlineData?->mimeType);
+        $this->assertNull($content->parts[1]->inlineData);
+        $this->assertSame("<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>", $content->parts[1]->text);
+        $this->assertSame(['text' => "<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>"], $content->parts[1]->toArray());
+        $this->assertSame('Sum it', $content->parts[2]->text);
+    }
+
+    public function testRequestRejectsDocxAttachmentBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('generativeModel');
+
+        $payload = Conversation::fromUser(UserPrompt::create('Summarize'))
+            ->withAttachments(Attachment::fromBytes('PK docx', Attachment::DOCX))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client->request($this->model, $payload);
+            $this->fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            $this->assertNotInstanceOf(ClientException::class, $e);
+            $this->assertSame(sprintf('Gemini model "%s" does not accept "%s" attachments.', $this->getDefaultModelId(), Attachment::DOCX), $e->getMessage());
+        }
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -1240,5 +1295,15 @@ final class GeminiClientTest extends ClientTestCase
         } catch (ClientException $e) {
             $this->assertSame($cause, $e->getPrevious());
         }
+    }
+
+    public function testNonAttachmentEntryBecomesClientException(): void
+    {
+        $model = $this->createMockModel('gemini-1.5-flash', [], 4096);
+        $this->apiClient->expects($this->never())->method('generativeModel');
+
+        $this->expectException(ClientException::class);
+
+        $this->client->request($model, [['role' => 'user', 'content' => 'x', 'attachments' => ['not an attachment']]]);
     }
 }

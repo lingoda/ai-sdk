@@ -40,10 +40,13 @@ final class AnthropicClient implements ClientInterface
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface
     {
         $hasAttachments = $this->hasAttachments($payload);
-        $expanded = $this->expandAttachments($payload, static fn (Attachment $attachment): array => [
-            'type' => $attachment->isImage() ? 'image' : 'document',
-            'source' => ['type' => 'base64', 'media_type' => $attachment->mimeType, 'data' => base64_encode($attachment->bytes())],
-        ]);
+        $modelId = $model->getId();
+        $expanded = $this->expandAttachments($payload, fn (Attachment $attachment, int $position): array => match (true) {
+            $attachment->isImage() => ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $attachment->mimeType, 'data' => base64_encode($attachment->bytes())]],
+            $attachment->isText() => ['type' => 'document', 'title' => sprintf('document-%d', $position), 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => $attachment->bytes()]],
+            $attachment->mimeType === Attachment::PDF => ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => Attachment::PDF, 'data' => base64_encode($attachment->bytes())]],
+            default => throw $this->unsupportedAttachment('Anthropic', $modelId, $attachment),
+        });
 
         try {
             $requestPayload = $this->buildChatPayload($model, $expanded, $options);
