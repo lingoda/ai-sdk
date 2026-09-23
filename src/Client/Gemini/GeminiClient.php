@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk\Client\Gemini;
 
 use Gemini\Client as GeminiAPIClient;
+use Gemini\Data\Blob;
 use Gemini\Data\Content;
 use Gemini\Data\DataFormat;
 use Gemini\Data\GenerationConfig;
@@ -12,15 +13,19 @@ use Gemini\Data\Part;
 use Gemini\Data\Schema;
 use Gemini\Enums\DataType;
 use Gemini\Enums\FinishReason;
+use Gemini\Enums\MimeType;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Enums\Role;
+use Lingoda\AiSdk\Client\AttachmentBlocksTrait;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Gemini\GeminiResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ResponseDecodeException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Provider\GeminiProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\ObjectResult;
@@ -32,6 +37,8 @@ use Webmozart\Assert\Assert;
 
 final class GeminiClient implements ClientInterface
 {
+    use AttachmentBlocksTrait;
+
     private const RESPONSE_SCHEMA_KEYS = [
         'type', 'format', 'description', 'nullable', 'enum', 'maxItems', 'minItems',
         'properties', 'required', 'propertyOrdering', 'items', 'title', 'minProperties',
@@ -55,6 +62,7 @@ final class GeminiClient implements ClientInterface
 
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface
     {
+        $hasAttachments = $this->hasAttachments($payload);
         try {
             $requestData = $this->buildChatPayload($model, $payload, $options);
 
@@ -80,7 +88,14 @@ final class GeminiClient implements ClientInterface
             $response = $generativeModel->generateContent(...$contentObjects);
 
             $result = $this->getResultConverter()->convert($model, $response);
+        } catch (UnsupportedCapabilityException $e) {
+            // Unsupported attachment type, raised before any request
+            throw $e;
         } catch (\Throwable $e) {
+            if ($hasAttachments) {
+                throw $this->attachmentFailure($this->logger, 'Gemini', $model->getId(), $e::class, $e->getMessage());
+            }
+
             $this->logger->error('Gemini request failed', [
                 'exception' => $e,
                 'model' => $model->getId(),
@@ -108,6 +123,25 @@ final class GeminiClient implements ClientInterface
     private function getResultConverter(): GeminiResultConverter
     {
         return $this->resultConverter ??= new GeminiResultConverter();
+    }
+
+    /**
+     * @param list<Attachment> $attachments
+     *
+     * @throws UnsupportedCapabilityException for types Gemini does not accept (no GIF), before any request
+     *
+     * @return list<Part>
+     */
+    private function attachmentParts(array $attachments): array
+    {
+        $parts = [];
+        foreach ($attachments as $attachment) {
+            $mimeType = MimeType::tryFrom($attachment->mimeType)
+                ?? throw new UnsupportedCapabilityException(sprintf('Gemini does not accept "%s" attachments.', $attachment->mimeType));
+            $parts[] = new Part(inlineData: new Blob(mimeType: $mimeType, data: base64_encode($attachment->bytes())));
+        }
+
+        return $parts;
     }
 
     /**
@@ -152,7 +186,7 @@ final class GeminiClient implements ClientInterface
                 }
             } elseif (isset($payload[0]) && is_array($payload[0]) && isset($payload[0]['role'])) {
                 // Check if payload is already an array of message objects (from Conversation::toArray())
-                /** @var array{role: string, content: string} $message */
+                /** @var array{role: string, content: string, attachments?: list<Attachment>} $message */
                 foreach ($payload as $message) {
                     if ($message['role'] === 'system') {
                         $systemInstruction = new Content(
@@ -161,7 +195,7 @@ final class GeminiClient implements ClientInterface
                     } else {
                         $role = $message['role'] === 'assistant' ? Role::MODEL : Role::USER; // Gemini uses MODEL for assistant
                         $contents[] = new Content(
-                            parts: [new Part(text: $message['content'])],
+                            parts: [...$this->attachmentParts($message['attachments'] ?? []), new Part(text: $message['content'])],
                             role: $role
                         );
                     }
@@ -175,6 +209,9 @@ final class GeminiClient implements ClientInterface
 
                     Assert::string($message['role']);
                     Assert::string($message['content']);
+                    $attachments = $message['attachments'] ?? [];
+                    Assert::isList($attachments);
+                    Assert::allIsInstanceOf($attachments, Attachment::class);
 
                     if ($message['role'] === 'system') {
                         $systemInstruction = new Content(
@@ -183,7 +220,7 @@ final class GeminiClient implements ClientInterface
                     } else {
                         $role = $message['role'] === 'assistant' ? Role::MODEL : Role::USER;
                         $contents[] = new Content(
-                            parts: [new Part(text: $message['content'])],
+                            parts: [...$this->attachmentParts($attachments), new Part(text: $message['content'])],
                             role: $role
                         );
                     }

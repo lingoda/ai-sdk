@@ -17,9 +17,13 @@ final readonly class RateLimitedClient implements ClientInterface
 {
     private const int MAX_RETRIES = 10;
     private const int BASE_RETRY_DELAY = 1; // seconds
-    
+
     private DelayInterface $delay;
 
+    /**
+     * @param bool $retryTransportErrors false skips the generic error retries (for clients whose transport already retries,
+     *                                   like async-aws for Bedrock) while still waiting for the local rate limiter
+     */
     public function __construct(
         private ClientInterface $client,
         private RateLimiterInterface $rateLimiter,
@@ -28,6 +32,7 @@ final readonly class RateLimitedClient implements ClientInterface
         ?DelayInterface $delay = null,
         private bool $enableRetries = true,
         private int $maxRetries = self::MAX_RETRIES,
+        private bool $retryTransportErrors = true,
     ) {
         $this->delay = $delay ?? new SystemDelay();
     }
@@ -66,7 +71,7 @@ final readonly class RateLimitedClient implements ClientInterface
                     'exception_class' => get_class($e),
                 ]);
 
-                if (!$this->enableRetries) {
+                if (!$this->enableRetries || !$this->retryTransportErrors) {
                     // If retries are disabled, throw immediately
                     throw $e;
                 }
@@ -105,7 +110,7 @@ final readonly class RateLimitedClient implements ClientInterface
         }
 
         $retryAfter = max($e->getRetryAfter(), 0);
-        
+
         $this->logger->warning('Rate limit exceeded. Waiting before retry.', [
             'retry_after' => $retryAfter,
             'attempt' => $attempt + 1,
@@ -119,7 +124,7 @@ final readonly class RateLimitedClient implements ClientInterface
     private function isRetryableError(\Throwable $e): bool
     {
         $message = $e->getMessage();
-        
+
         // Common retryable error patterns
         $retryablePatterns = [
             'timeout',

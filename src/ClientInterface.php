@@ -5,6 +5,8 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk;
 
 use Lingoda\AiSdk\Exception\ClientException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
+use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Result\ResultInterface;
 
 interface ClientInterface
@@ -17,10 +19,11 @@ interface ClientInterface
     /**
      * Make a request to the AI provider.
      *
-     * @param array<string, mixed>|array<int, array{role: string, content: string}>|string $payload
+     * @param array<string, mixed>|array<int, array{role: string, content: string, attachments?: list<Attachment>}>|string $payload
      * @param array<string, mixed> $options
      *
      * @throws ClientException
+     * @throws UnsupportedCapabilityException when the payload carries attachments the client cannot convert
      */
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface;
 

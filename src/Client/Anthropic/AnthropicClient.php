@@ -5,12 +5,14 @@ declare(strict_types = 1);
 namespace Lingoda\AiSdk\Client\Anthropic;
 
 use Anthropic\Client as AnthropicAPIClient;
+use Lingoda\AiSdk\Client\AttachmentBlocksTrait;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Anthropic\AnthropicResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\ModelInterface;
+use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Provider\AnthropicProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\ResultInterface;
@@ -19,6 +21,8 @@ use Psr\Log\NullLogger;
 
 final class AnthropicClient implements ClientInterface
 {
+    use AttachmentBlocksTrait;
+
     private ?AnthropicResultConverter $resultConverter = null;
     private ?AnthropicProvider $provider = null;
 
@@ -35,12 +39,22 @@ final class AnthropicClient implements ClientInterface
 
     public function request(ModelInterface $model, array|string $payload, array $options = []): ResultInterface
     {
+        $hasAttachments = $this->hasAttachments($payload);
+        $expanded = $this->expandAttachments($payload, static fn (Attachment $attachment): array => [
+            'type' => $attachment->isImage() ? 'image' : 'document',
+            'source' => ['type' => 'base64', 'media_type' => $attachment->mimeType, 'data' => base64_encode($attachment->bytes())],
+        ]);
+
         try {
-            $requestPayload = $this->buildChatPayload($model, $payload, $options);
+            $requestPayload = $this->buildChatPayload($model, $expanded, $options);
             $response = $this->client->messages()->create($requestPayload);
 
             return $this->getResultConverter()->convert($model, $response);
         } catch (\Throwable $e) {
+            if ($hasAttachments) {
+                throw $this->attachmentFailure($this->logger, 'Anthropic', $model->getId(), $e::class, $e->getMessage());
+            }
+
             $this->logger->error('Anthropic request failed', [
                 'exception' => $e,
                 'model' => $model->getId(),
@@ -86,7 +100,7 @@ final class AnthropicClient implements ClientInterface
             // Check if payload is already an array of message objects (from Conversation::toArray())
             if (isset($payload[0]) && is_array($payload[0]) && isset($payload[0]['role'])) {
                 // Payload is an array of message objects, separate system from user/assistant messages
-                /** @var array{role: string, content: string} $message */
+                /** @var array{role: string, content: string|list<array<string, mixed>>} $message */
                 foreach ($payload as $message) {
                     if ($message['role'] === 'system') {
                         $systemPrompt = $message['content'];

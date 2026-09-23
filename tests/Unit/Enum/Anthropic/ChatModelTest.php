@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Enum\Anthropic;
 
@@ -18,6 +18,13 @@ final class ChatModelTest extends TestCase
         $this->assertEquals('claude-3-7-sonnet-20250219', ChatModel::CLAUDE_SONNET_37->value);
         $this->assertEquals('claude-3-5-haiku-20241022', ChatModel::CLAUDE_HAIKU_35->value);
         $this->assertEquals('claude-3-haiku-20240307', ChatModel::CLAUDE_HAIKU_3->value);
+    }
+
+    public function testGetDefaultModel(): void
+    {
+        foreach (ChatModel::cases() as $model) {
+            $this->assertSame('claude-3-5-haiku-20241022', $model->getDefaultModel());
+        }
     }
 
     public function testGetId(): void
@@ -56,6 +63,7 @@ final class ChatModelTest extends TestCase
             Capability::TEXT,
             Capability::TOOLS,
             Capability::VISION,
+            Capability::DOCUMENT,
             Capability::MULTIMODAL,
         ];
 
@@ -64,7 +72,12 @@ final class ChatModelTest extends TestCase
         $this->assertEquals($expectedCapabilities, ChatModel::CLAUDE_SONNET_4->getCapabilities());
         $this->assertEquals($expectedCapabilities, ChatModel::CLAUDE_SONNET_37->getCapabilities());
         $this->assertEquals($expectedCapabilities, ChatModel::CLAUDE_HAIKU_35->getCapabilities());
-        $this->assertEquals($expectedCapabilities, ChatModel::CLAUDE_HAIKU_3->getCapabilities());
+
+        // Claude 3 Haiku predates PDF support
+        $this->assertEquals(
+            [Capability::TEXT, Capability::TOOLS, Capability::VISION, Capability::MULTIMODAL],
+            ChatModel::CLAUDE_HAIKU_3->getCapabilities()
+        );
     }
 
     public function testHasCapability(): void
@@ -93,7 +106,7 @@ final class ChatModelTest extends TestCase
             'max_tokens' => 32000,
             'top_p' => 1.0,
         ];
-        
+
         $this->assertEquals($opusExpectedOptions, ChatModel::CLAUDE_OPUS_41->getOptions());
         $this->assertEquals($opusExpectedOptions, ChatModel::CLAUDE_OPUS_4->getOptions());
 
@@ -102,7 +115,7 @@ final class ChatModelTest extends TestCase
             'max_tokens' => 64000,
             'top_p' => 1.0,
         ];
-        
+
         $this->assertEquals($sonnetExpectedOptions, ChatModel::CLAUDE_SONNET_4->getOptions());
         $this->assertEquals($sonnetExpectedOptions, ChatModel::CLAUDE_SONNET_37->getOptions());
 
@@ -111,7 +124,7 @@ final class ChatModelTest extends TestCase
             'max_tokens' => 8192,
             'top_p' => 1.0,
         ];
-        
+
         $this->assertEquals($haiku35ExpectedOptions, ChatModel::CLAUDE_HAIKU_35->getOptions());
 
         $haiku3ExpectedOptions = [
@@ -119,7 +132,7 @@ final class ChatModelTest extends TestCase
             'max_tokens' => 4096,
             'top_p' => 1.0,
         ];
-        
+
         $this->assertEquals($haiku3ExpectedOptions, ChatModel::CLAUDE_HAIKU_3->getOptions());
     }
 
@@ -136,7 +149,7 @@ final class ChatModelTest extends TestCase
     public function testImplementsModelConfigurationInterface(): void
     {
         $model = ChatModel::CLAUDE_SONNET_4;
-        
+
         $this->assertIsString($model->getId());
         $this->assertIsInt($model->getMaxTokens());
         $this->assertIsInt($model->getMaxOutputTokens());
@@ -169,7 +182,7 @@ final class ChatModelTest extends TestCase
         $opus41 = ChatModel::CLAUDE_OPUS_41;
         $this->assertEquals(32000, $opus41->getMaxOutputTokens());
         $this->assertEquals('Claude Opus 4.1', $opus41->getDisplayName());
-        
+
         $opus4 = ChatModel::CLAUDE_OPUS_4;
         $this->assertEquals(32000, $opus4->getMaxOutputTokens());
         $this->assertEquals('Claude Opus 4', $opus4->getDisplayName());
@@ -178,7 +191,7 @@ final class ChatModelTest extends TestCase
         $sonnet4 = ChatModel::CLAUDE_SONNET_4;
         $this->assertEquals(64000, $sonnet4->getMaxOutputTokens());
         $this->assertEquals('Claude Sonnet 4', $sonnet4->getDisplayName());
-        
+
         $sonnet37 = ChatModel::CLAUDE_SONNET_37;
         $this->assertEquals(64000, $sonnet37->getMaxOutputTokens());
         $this->assertEquals('Claude Sonnet 3.7', $sonnet37->getDisplayName());
@@ -187,7 +200,7 @@ final class ChatModelTest extends TestCase
         $haiku35 = ChatModel::CLAUDE_HAIKU_35;
         $this->assertEquals(8192, $haiku35->getMaxOutputTokens());
         $this->assertEquals('Claude Haiku 3.5', $haiku35->getDisplayName());
-        
+
         $haiku3 = ChatModel::CLAUDE_HAIKU_3;
         $this->assertEquals(4096, $haiku3->getMaxOutputTokens());
         $this->assertEquals('Claude Haiku 3', $haiku3->getDisplayName());

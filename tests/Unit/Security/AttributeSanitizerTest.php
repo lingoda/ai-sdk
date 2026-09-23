@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Security;
 
@@ -30,7 +30,7 @@ final class AttributeSanitizerTest extends TestCase
     public function it_can_be_created_with_default_settings(): void
     {
         $sanitizer = AttributeSanitizer::createDefault($this->filter);
-        
+
         $this->assertTrue($sanitizer->isEnabled());
     }
 
@@ -38,7 +38,7 @@ final class AttributeSanitizerTest extends TestCase
     public function it_can_be_disabled(): void
     {
         $sanitizer = new AttributeSanitizer($this->filter, enabled: false);
-        
+
         $this->assertFalse($sanitizer->isEnabled());
     }
 
@@ -47,9 +47,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $sanitizer = new AttributeSanitizer($this->filter, enabled: false);
         $testObject = new TestObjectWithAttributes();
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals($testObject, $result);
     }
 
@@ -58,9 +58,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = 'Contact john.doe@example.com for support';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('Contact [EMAIL_REDACTED] for support', $result->emailField);
     }
 
@@ -69,9 +69,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->phoneField = 'Call us at 555-123-4567 or 555-987-6543';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('Call us at [PHONE] or [PHONE]', $result->phoneField);
     }
 
@@ -80,9 +80,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->sensitiveData = 'User email: admin@company.com and phone: (555) 123-4567';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('[PII_DETECTED]', $result->sensitiveData);
     }
 
@@ -91,9 +91,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->sensitiveData = 'This is completely safe data';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('This is completely safe data', $result->sensitiveData);
     }
 
@@ -102,9 +102,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->multipleAttributes = 'Contact john@example.com or call 555-123-4567';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         // First redact is applied, then sensitive check
         $this->assertEquals('[PII_DETECTED]', $result->multipleAttributes);
     }
@@ -116,9 +116,9 @@ final class AttributeSanitizerTest extends TestCase
         $nestedObject = new TestObjectWithAttributes();
         $nestedObject->emailField = 'nested@example.com';
         $testObject->nestedObject = $nestedObject;
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('[EMAIL_REDACTED]', $result->nestedObject->emailField);
     }
 
@@ -131,9 +131,9 @@ final class AttributeSanitizerTest extends TestCase
             'support@company.com',
             'safe text'
         ];
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals([
             '[EMAIL_REDACTED]',
             '[EMAIL_REDACTED]',
@@ -152,9 +152,9 @@ final class AttributeSanitizerTest extends TestCase
             ],
             'safe' => ['data', 'here']
         ];
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals([
             'contacts' => [
                 'primary' => '[EMAIL_REDACTED]',
@@ -170,9 +170,9 @@ final class AttributeSanitizerTest extends TestCase
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = null;
         $testObject->sensitiveData = null;
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertNull($result->emailField);
         $this->assertNull($result->sensitiveData);
     }
@@ -182,9 +182,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = 'test@example.com';
-        
+
         $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertCount(1, $this->logger->records);
         $this->assertEquals('warning', $this->logger->records[0]['level']);
         $this->assertStringContainsString('Property sanitized using attributes', $this->logger->records[0]['message']);
@@ -197,9 +197,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $plainObject = new PlainTestObject();
         $plainObject->name = 'test@example.com';
-        
+
         $result = $this->sanitizer->sanitize($plainObject);
-        
+
         // No attributes, so no changes expected
         $this->assertEquals('test@example.com', $result->name);
     }
@@ -208,12 +208,12 @@ final class AttributeSanitizerTest extends TestCase
     public function it_handles_reflection_exceptions_gracefully(): void
     {
         // Create an object that might cause reflection issues
-        $problematicObject = new class {
+        $problematicObject = new class() {
             private string $field = 'test@example.com';
         };
-        
+
         $result = $this->sanitizer->sanitize($problematicObject);
-        
+
         // Should return the original object on reflection errors
         $this->assertEquals($problematicObject, $result);
     }
@@ -236,10 +236,10 @@ final class AttributeSanitizerTest extends TestCase
             ]
         ];
         $arrayData['level1']['level2']->emailField = 'test@example.com';
-        
+
         // AttributeSanitizer only processes objects directly passed to it
         $result = $this->sanitizer->sanitize($arrayData);
-        
+
         // Should return array unchanged since AttributeSanitizer only handles objects
         $this->assertEquals($arrayData, $result);
     }
@@ -249,9 +249,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->customSensitive = 'Contains email: user@example.com';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('[CUSTOM_REDACTED]', $result->customSensitive);
     }
 
@@ -260,9 +260,9 @@ final class AttributeSanitizerTest extends TestCase
     {
         $testObject = new TestObjectWithAttributes();
         $testObject->typedSensitive = 'Contains PII: john@example.com';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals('[PII_REDACTED]', $result->typedSensitive);
     }
 
@@ -272,9 +272,9 @@ final class AttributeSanitizerTest extends TestCase
         $sanitizer = new AttributeSanitizer($this->filter, enabled: false);
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = 'test@example.com';
-        
+
         $result = $sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals($testObject, $result);
         $this->assertFalse($sanitizer->isEnabled());
     }
@@ -284,12 +284,12 @@ final class AttributeSanitizerTest extends TestCase
     {
         $logger = new TestLogger();
         $sanitizer = new AttributeSanitizer($this->filter, enabled: true, auditLog: false, logger: $logger);
-        
+
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = 'test@example.com';
-        
+
         $sanitizer->sanitize($testObject);
-        
+
         // No logs should be generated when audit logging is disabled
         $this->assertEmpty($logger->records);
     }
@@ -322,9 +322,9 @@ final class AttributeSanitizerTest extends TestCase
             'user@example.com' => 'Regular User',
             'safe_key' => 'Safe Data'
         ];
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         $this->assertEquals([
             '[EMAIL_REDACTED]' => 'Administrator',
             '[EMAIL_REDACTED]' => 'Regular User',
@@ -341,9 +341,9 @@ final class AttributeSanitizerTest extends TestCase
             'safe data',
             'another@example.com'
         ];
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         // The sensitive attribute will apply the fallback filter to each array element
         // Elements with sensitive content will be replaced
         $this->assertEquals([
@@ -362,26 +362,26 @@ final class AttributeSanitizerTest extends TestCase
             'no sensitive content here',
             'just normal text'
         ];
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         // Should remain unchanged if no sensitive content is detected
         $this->assertEquals([
             'completely safe data',
-            'no sensitive content here', 
+            'no sensitive content here',
             'just normal text'
         ], $result->sensitiveArray);
     }
 
-    #[Test] 
+    #[Test]
     public function it_handles_regex_failure_gracefully(): void
     {
         // Test with a property that has a redact attribute but no pattern matches
         $testObject = new TestObjectWithAttributes();
         $testObject->phoneField = 'No phone numbers here, just text';
-        
+
         $result = $this->sanitizer->sanitize($testObject);
-        
+
         // Should remain unchanged since no pattern matches
         $this->assertEquals('No phone numbers here, just text', $result->phoneField);
     }
@@ -390,15 +390,28 @@ final class AttributeSanitizerTest extends TestCase
     public function it_creates_default_sanitizer_with_correct_settings(): void
     {
         $sanitizer = AttributeSanitizer::createDefault($this->filter);
-        
+
         $this->assertTrue($sanitizer->isEnabled());
-        
+
         // Test that it works
         $testObject = new TestObjectWithAttributes();
         $testObject->emailField = 'test@example.com';
-        
+
         $result = $sanitizer->sanitize($testObject);
         $this->assertEquals('[EMAIL_REDACTED]', $result->emailField);
+    }
+
+    #[Test]
+    public function it_keeps_non_string_values_and_recurses_into_nested_arrays(): void
+    {
+        $testObject = new TestObjectWithAttributes();
+        $testObject->arrayWithEmails = ['count' => 3, 'enabled' => true, 'contact' => 'a@example.com'];
+        $testObject->sensitiveArray = ['limit' => 10, 'nested' => ['owner' => 'b@example.com', 'id' => 7]];
+
+        $result = $this->sanitizer->sanitize($testObject);
+
+        $this->assertSame(['count' => 3, 'enabled' => true, 'contact' => '[EMAIL_REDACTED]'], $result->arrayWithEmails);
+        $this->assertSame(['limit' => 10, 'nested' => ['owner' => '[ARRAY_SENSITIVE]', 'id' => 7]], $result->sensitiveArray);
     }
 }
 

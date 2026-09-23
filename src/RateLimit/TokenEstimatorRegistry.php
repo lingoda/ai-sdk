@@ -33,14 +33,14 @@ final class TokenEstimatorRegistry
     public function getEstimatorForModel(ModelInterface $model): TokenEstimatorInterface
     {
         $providerId = $model->getProvider()->getId();
-        
+
         return $this->estimators[$providerId] ?? new TokenEstimator();
     }
 
     /**
      * Estimate tokens for a model using the appropriate estimator.
      *
-     * @param array<string, mixed>|array<int, array{role: string, content: string}>|string $payload
+     * @param array<string, mixed>|array<int, array{role: string, content: string, attachments?: list<\Lingoda\AiSdk\Prompt\Attachment>}>|string $payload
      */
     public function estimate(ModelInterface $model, array|string $payload): int
     {
@@ -53,11 +53,11 @@ final class TokenEstimatorRegistry
     public static function createDefault(): self
     {
         $registry = new self();
-        
+
         $registry->register(AIProvider::OPENAI, new OpenAITokenEstimator());
         $registry->register(AIProvider::ANTHROPIC, new AnthropicTokenEstimator());
         $registry->register(AIProvider::GEMINI, new GeminiTokenEstimator());
-        
+
         return $registry;
     }
 

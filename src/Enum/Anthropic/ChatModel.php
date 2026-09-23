@@ -14,17 +14,17 @@ enum ChatModel: string implements ModelConfigurationInterface
 {
     // Claude 4.1 Series (Latest - Recommended)
     case CLAUDE_OPUS_41 = 'claude-opus-4-1-20250805';
-    
+
     // Claude 4.0 Series (Current - Recommended)
     case CLAUDE_OPUS_4 = 'claude-opus-4-20250514';
     case CLAUDE_SONNET_4 = 'claude-sonnet-4-20250514';
-    
+
     // Claude 3.7 Series (Current)
     case CLAUDE_SONNET_37 = 'claude-3-7-sonnet-20250219';
-    
+
     // Claude 3.5 Series (Active)
     case CLAUDE_HAIKU_35 = 'claude-3-5-haiku-20241022';
-    
+
     // Claude 3 Series (Active)
     case CLAUDE_HAIKU_3 = 'claude-3-haiku-20240307';
 
@@ -69,12 +69,19 @@ enum ChatModel: string implements ModelConfigurationInterface
     public function getCapabilities(): array
     {
         return match ($this) {
-            // All Claude models support text, tools, vision, and multimodal
+            // PDF input builds on vision
             self::CLAUDE_OPUS_41,
             self::CLAUDE_OPUS_4,
             self::CLAUDE_SONNET_4,
             self::CLAUDE_SONNET_37,
-            self::CLAUDE_HAIKU_35,
+            self::CLAUDE_HAIKU_35 => [
+                Capability::TEXT,
+                Capability::TOOLS,
+                Capability::VISION,
+                Capability::DOCUMENT,
+                Capability::MULTIMODAL,
+            ],
+            // Claude 3 Haiku predates PDF support
             self::CLAUDE_HAIKU_3 => [
                 Capability::TEXT,
                 Capability::TOOLS,

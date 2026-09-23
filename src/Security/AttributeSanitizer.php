@@ -67,18 +67,17 @@ final readonly class AttributeSanitizer
             $sanitized = clone $data;
 
             foreach ($reflection->getProperties() as $property) {
-                $property->setAccessible(true);
                 $originalValue = $property->getValue($sanitized);
-                
+
                 if ($originalValue === null) {
                     continue;
                 }
 
                 $sanitizedValue = $this->sanitizeProperty($property, $originalValue);
-                
+
                 if ($sanitizedValue !== $originalValue) {
                     $property->setValue($sanitized, $sanitizedValue);
-                    
+
                     if ($this->auditLog) {
                         $this->logSanitization($property, $originalValue, $sanitizedValue);
                     }
@@ -91,7 +90,7 @@ final readonly class AttributeSanitizer
                 'error' => $e->getMessage(),
                 'object_class' => get_class($data)
             ]);
-            
+
             return $data;
         }
     }
@@ -103,15 +102,15 @@ final readonly class AttributeSanitizer
     {
         // Process #[Redact] attributes first
         $value = $this->processRedactAttributes($property, $value);
-        
+
         // Process #[Sensitive] attributes
         $value = $this->processSensitiveAttributes($property, $value);
-        
+
         // For nested objects, we need to process them too (but DataSanitizer will handle arrays and strings)
         if (is_object($value)) {
             $value = $this->sanitizeObject($value);
         }
-        
+
         return $value;
     }
 
@@ -121,17 +120,17 @@ final readonly class AttributeSanitizer
     private function processRedactAttributes(ReflectionProperty $property, mixed $value): mixed
     {
         $redactAttributes = $property->getAttributes(Redact::class);
-        
+
         foreach ($redactAttributes as $attribute) {
             $redact = $attribute->newInstance();
-            
+
             if (is_string($value)) {
                 $sanitized = preg_replace(
                     $redact->getPattern(),
                     $redact->getReplacement(),
                     $value
                 );
-                
+
                 if ($sanitized !== null) {
                     $value = $sanitized;
                 }
@@ -139,7 +138,7 @@ final readonly class AttributeSanitizer
                 $value = $this->applyRedactToArray($value, $redact);
             }
         }
-        
+
         return $value;
     }
 
@@ -149,14 +148,14 @@ final readonly class AttributeSanitizer
     private function processSensitiveAttributes(ReflectionProperty $property, mixed $value): mixed
     {
         $sensitiveAttributes = $property->getAttributes(Sensitive::class);
-        
+
         foreach ($sensitiveAttributes as $attribute) {
             $sensitive = $attribute->newInstance();
-            
+
             if (is_string($value)) {
                 // Use fallback filter for sensitive content detection
                 $filteredValue = $this->fallbackFilter->filter($value);
-                
+
                 // If content was filtered, replace with custom redaction text
                 if ($filteredValue !== $value) {
                     $value = $sensitive->getRedactionText();
@@ -165,7 +164,7 @@ final readonly class AttributeSanitizer
                 $value = $this->applySensitiveToArray($value, $sensitive);
             }
         }
-        
+
         return $value;
     }
 
@@ -178,10 +177,10 @@ final readonly class AttributeSanitizer
     private function applyRedactToArray(array $array, Redact $redact): array
     {
         $result = [];
-        
+
         foreach ($array as $key => $value) {
             $sanitizedKey = is_string($key) ? $this->applyRedactToString($key, $redact) : $key;
-            
+
             if (is_string($value)) {
                 $result[$sanitizedKey] = $this->applyRedactToString($value, $redact);
             } elseif (is_array($value)) {
@@ -190,7 +189,7 @@ final readonly class AttributeSanitizer
                 $result[$sanitizedKey] = $value;
             }
         }
-        
+
         return $result;
     }
 
@@ -203,7 +202,7 @@ final readonly class AttributeSanitizer
     private function applySensitiveToArray(array $array, Sensitive $sensitive): array
     {
         $result = [];
-        
+
         foreach ($array as $key => $value) {
             if (is_string($value)) {
                 $filteredValue = $this->fallbackFilter->filter($value);
@@ -214,7 +213,7 @@ final readonly class AttributeSanitizer
                 $result[$key] = $value;
             }
         }
-        
+
         return $result;
     }
 
@@ -228,7 +227,7 @@ final readonly class AttributeSanitizer
             $redact->getReplacement(),
             $value
         );
-        
+
         return $sanitized ?? $value;
     }
 
@@ -239,15 +238,15 @@ final readonly class AttributeSanitizer
     private function logSanitization(ReflectionProperty $property, mixed $originalValue, mixed $sanitizedValue): void
     {
         $attributes = [];
-        
+
         foreach ($property->getAttributes(Redact::class) as $attr) {
             $attributes[] = 'Redact';
         }
-        
+
         foreach ($property->getAttributes(Sensitive::class) as $attr) {
             $attributes[] = 'Sensitive';
         }
-        
+
         $this->logger->warning('Property sanitized using attributes', [
             'class' => $property->getDeclaringClass()->getName(),
             'property' => $property->getName(),

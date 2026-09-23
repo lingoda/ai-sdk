@@ -199,9 +199,12 @@ final readonly class Conversation
             return $this;
         }
 
-        // Create new sanitized instance with sanitized user prompt
+        // Create new sanitized instance with sanitized user prompt, attachments are not sanitized
         return new self(
-            UserPrompt::create(is_string($sanitizedUserContent) ? $sanitizedUserContent : $originalUserContent),
+            new UserPrompt(
+                is_string($sanitizedUserContent) ? $sanitizedUserContent : $originalUserContent,
+                attachments: $this->userPrompt->getAttachments(),
+            ),
             $this->systemPrompt,
             $this->assistantPrompt,
             true // Mark as sanitized
@@ -216,6 +219,19 @@ final readonly class Conversation
         return new self(
             $this->userPrompt,
             $systemPrompt,
+            $this->assistantPrompt,
+            $this->isSanitized
+        );
+    }
+
+    /**
+     * Replace the attachments (documents, images) of the user prompt
+     */
+    public function withAttachments(Attachment ...$attachments): self
+    {
+        return new self(
+            $this->userPrompt->withAttachments(...$attachments),
+            $this->systemPrompt,
             $this->assistantPrompt,
             $this->isSanitized
         );
@@ -237,21 +253,44 @@ final readonly class Conversation
     /**
      * Convert to messages array format (common for chat APIs)
      *
-     * @return array<int, array{role: string, content: string}>
+     * Attachments appear as metadata only (mime, size), so this is safe for traces and queued messages.
+     *
+     * @return array<int, array{role: string, content: string, attachments?: list<array{mime: string, size: int}>}>
      */
     public function toArray(): array
     {
-        $messages = [];
+        $messages = $this->contextMessages();
+        $user = $this->userPrompt->toArray();
 
-        if ($this->systemPrompt !== null) {
-            $messages[] = $this->systemPrompt->toArray();
+        if ($this->userPrompt->hasAttachments()) {
+            $user['attachments'] = array_map(
+                static fn (Attachment $attachment): array => $attachment->toMetadata(),
+                $this->userPrompt->getAttachments()
+            );
         }
 
-        if ($this->assistantPrompt !== null) {
-            $messages[] = $this->assistantPrompt->toArray();
+        $messages[] = $user;
+
+        return $messages;
+    }
+
+    /**
+     * Payload handed to clients: same shape as toArray(), but attachments carry the Attachment objects.
+     *
+     * @internal used by Platform only, never log or trace this output
+     *
+     * @return array<int, array{role: string, content: string, attachments?: list<Attachment>}>
+     */
+    public function toRequestArray(): array
+    {
+        $messages = $this->contextMessages();
+        $user = $this->userPrompt->toArray();
+
+        if ($this->userPrompt->hasAttachments()) {
+            $user['attachments'] = $this->userPrompt->getAttachments();
         }
 
-        $messages[] = $this->userPrompt->toArray();
+        $messages[] = $user;
 
         return $messages;
     }
@@ -311,11 +350,49 @@ final readonly class Conversation
      */
     public function hash(): string
     {
+        if ($this->userPrompt->hasAttachments()) {
+            // Separate, length-prefixed encoding: no text-only conversation can produce the same hash
+            $parts = [
+                $this->systemPrompt?->getContent() ?? '',
+                $this->assistantPrompt?->getContent() ?? '',
+                $this->userPrompt->getContent(),
+                ...array_map(
+                    static fn (Attachment $attachment): string => $attachment->mimeType . ':' . $attachment->sha256,
+                    $this->userPrompt->getAttachments()
+                ),
+            ];
+
+            return md5('conversation-with-attachments:' . implode('', array_map(
+                static fn (string $part): string => mb_strlen($part, '8bit') . ':' . $part,
+                $parts
+            )));
+        }
+
         return md5(sprintf(
             'system:%s|assistant:%s|user:%s',
             $this->systemPrompt?->getContent() ?? '',
             $this->assistantPrompt?->getContent() ?? '',
             $this->userPrompt->getContent()
         ));
+    }
+
+    /**
+     * System and assistant messages, in the order they precede the user message.
+     *
+     * @return list<array{role: string, content: string}>
+     */
+    private function contextMessages(): array
+    {
+        $messages = [];
+
+        if ($this->systemPrompt !== null) {
+            $messages[] = $this->systemPrompt->toArray();
+        }
+
+        if ($this->assistantPrompt !== null) {
+            $messages[] = $this->assistantPrompt->toArray();
+        }
+
+        return $messages;
     }
 }

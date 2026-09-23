@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Enum\Gemini;
 
@@ -16,6 +16,13 @@ final class ChatModelTest extends TestCase
         $this->assertEquals('gemini-2.5-flash', ChatModel::GEMINI_2_5_FLASH->value);
         $this->assertEquals('gemini-3.1-flash-lite', ChatModel::GEMINI_3_1_FLASH_LITE->value);
         $this->assertSame(ChatModel::GEMINI_3_1_FLASH_LITE, ChatModel::from('gemini-3.1-flash-lite'));
+    }
+
+    public function testGetDefaultModel(): void
+    {
+        foreach (ChatModel::cases() as $model) {
+            $this->assertSame('gemini-2.5-flash', $model->getDefaultModel());
+        }
     }
 
     public function testGetId(): void
@@ -38,6 +45,7 @@ final class ChatModelTest extends TestCase
             Capability::TEXT,
             Capability::TOOLS,
             Capability::VISION,
+            Capability::DOCUMENT,
             Capability::MULTIMODAL,
         ];
 
@@ -94,7 +102,7 @@ final class ChatModelTest extends TestCase
     public function testImplementsModelConfigurationInterface(): void
     {
         $model = ChatModel::GEMINI_2_5_PRO;
-        
+
         $this->assertIsString($model->getId());
         $this->assertIsInt($model->getMaxTokens());
         $this->assertIsArray($model->getCapabilities());
@@ -131,7 +139,7 @@ final class ChatModelTest extends TestCase
         // But different IDs and display names
         $this->assertNotEquals($pro->getId(), $flash->getId());
         $this->assertNotEquals($pro->getDisplayName(), $flash->getDisplayName());
-        
+
         $this->assertEquals('Gemini 2.5 Pro', $pro->getDisplayName());
         $this->assertEquals('Gemini 2.5 Flash', $flash->getDisplayName());
     }

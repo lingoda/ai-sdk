@@ -11,7 +11,7 @@ interface TokenEstimatorInterface
     /**
      * Estimate the number of tokens for the given payload.
      *
-     * @param array<string, mixed>|array<int, array{role: string, content: string}>|string $payload
+     * @param array<string, mixed>|array<int, array{role: string, content: string, attachments?: list<\Lingoda\AiSdk\Prompt\Attachment>}>|string $payload
      */
     public function estimate(ModelInterface $model, array|string $payload): int;
 }

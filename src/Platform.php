@@ -6,10 +6,14 @@ namespace Lingoda\AiSdk;
 
 use Lingoda\AiSdk\Audio\AudioCapableInterface;
 use Lingoda\AiSdk\Audio\AudioOptionsInterface;
+use Lingoda\AiSdk\Enum\Capability;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ModelNotFoundException;
 use Lingoda\AiSdk\Exception\RuntimeException;
+use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
+use Lingoda\AiSdk\Model\CapabilityValidator;
+use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Prompt\Conversation;
 use Lingoda\AiSdk\Prompt\Prompt;
 use Lingoda\AiSdk\Prompt\UserPrompt;
@@ -259,21 +263,16 @@ final readonly class Platform implements PlatformInterface
     /**
      * @param array<string, mixed> $options Additional options for the request
      *
-     * @throws RuntimeException|ClientException
+     * @throws RuntimeException|ClientException|UnsupportedCapabilityException
      */
-    private function invoke(ModelInterface $model, Prompt|Conversation $input, array $options = []): ResultInterface
+    private function invoke(ModelInterface $model, UserPrompt|Conversation $input, array $options = []): ResultInterface
     {
         $client = $this->findClientForModel($model);
 
-        // Convert Prompt to Conversation if needed
-        if ($input instanceof Conversation) {
-            $conversation = $input;
-        } elseif ($input instanceof UserPrompt) {
-            $conversation = Conversation::fromUser($input);
-        } else {
-            // For other Prompt types, create UserPrompt from content
-            $conversation = Conversation::fromUser(UserPrompt::create($input->getContent()));
-        }
+        // normalizeInput() already turned any other Prompt type into a Conversation
+        $conversation = $input instanceof Conversation ? $input : Conversation::fromUser($input);
+
+        $this->validateAttachments($model, $conversation->getUserPrompt()->getAttachments());
 
         // Sanitize conversation if enabled
         if ($this->enableSanitization && $this->sanitizer !== null) {
@@ -291,10 +290,40 @@ final readonly class Platform implements PlatformInterface
             }
         }
 
-        // Convert conversation to appropriate payload format
-        $payload = $conversation->toArray();
+        // Convert conversation to appropriate payload format (identical to toArray() without attachments)
+        $payload = $conversation->toRequestArray();
 
         return $client->request($model, $payload, $options);
+    }
+
+    /**
+     * Reject attachments the model cannot read before any client call, and log their metadata only.
+     *
+     * @param list<Attachment> $attachments
+     *
+     * @throws UnsupportedCapabilityException
+     */
+    private function validateAttachments(ModelInterface $model, array $attachments): void
+    {
+        if ($attachments === []) {
+            return;
+        }
+
+        $required = [];
+        foreach ($attachments as $attachment) {
+            $capability = $attachment->isImage() ? Capability::VISION : Capability::DOCUMENT;
+            $required[$capability->value] = $capability;
+        }
+
+        CapabilityValidator::requireCapabilities($model, array_values($required));
+
+        foreach ($attachments as $attachment) {
+            $this->logger->info('Attachment sent with user prompt', [
+                'provider' => $model->getProvider()->getId(),
+                'model' => $model->getId(),
+                ...$attachment->toMetadata(),
+            ]);
+        }
     }
 
     /**
@@ -418,16 +447,19 @@ final readonly class Platform implements PlatformInterface
             ));
         }
 
+        // OpenAI has a 25MB limit for audio files
+        $maxSize = 25 * 1024 * 1024; // 25MB
         $fileSize = filesize($audioFilePath);
+        // Unreachable after the checks above
+        // @codeCoverageIgnoreStart
         if ($fileSize === false) {
             throw new InvalidArgumentException(sprintf(
                 'Could not determine file size for: %s',
                 $audioFilePath
             ));
         }
+        // @codeCoverageIgnoreEnd
 
-        // OpenAI has a 25MB limit for audio files
-        $maxSize = 25 * 1024 * 1024; // 25MB
         if ($fileSize > $maxSize) {
             throw new InvalidArgumentException(sprintf(
                 'Audio file too large: %s (%.2f MB). Maximum size is 25 MB.',

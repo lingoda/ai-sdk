@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Client\Anthropic;
 
@@ -11,8 +11,12 @@ use Lingoda\AiSdk\Client\Anthropic\AnthropicClient;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Converter\Anthropic\AnthropicResultConverter;
 use Lingoda\AiSdk\Enum\AIProvider;
-use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ClientException;
+use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Prompt\Attachment;
+use Lingoda\AiSdk\Prompt\Conversation;
+use Lingoda\AiSdk\Prompt\SystemPrompt;
+use Lingoda\AiSdk\Prompt\UserPrompt;
 use Lingoda\AiSdk\Provider\AnthropicProvider;
 use Lingoda\AiSdk\Result\ResultInterface;
 use Lingoda\AiSdk\Tests\Unit\Client\ClientTestCase;
@@ -25,17 +29,17 @@ final class AnthropicClientTest extends ClientTestCase
     {
         return new AnthropicClient($apiClient, $logger);
     }
-    
+
     protected function getProviderEnum(): AIProvider
     {
         return AIProvider::ANTHROPIC;
     }
-    
+
     protected function getApiClientClass(): string
     {
         return AnthropicAPIClient::class;
     }
-    
+
     protected function getDefaultModelId(): string
     {
         return 'claude-3-haiku-20240307';
@@ -102,6 +106,21 @@ final class AnthropicClientTest extends ClientTestCase
         self::assertSame($this->getDefaultModelId(), $result['model']);
         self::assertSame($expectedMessages, $result['messages']);
         self::assertArrayNotHasKey('system', $result); // No system field when not provided
+    }
+
+    public function testBuildChatPayloadWithDirectMessagesArrayAndSystem(): void
+    {
+        $payload = [
+            'system' => 'You are helpful',
+            'messages' => [
+                ['role' => 'user', 'content' => 'Hello'],
+            ],
+        ];
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$this->model, $payload, []]);
+
+        self::assertSame([['role' => 'user', 'content' => 'Hello']], $result['messages']);
+        self::assertSame('You are helpful', $result['system']);
     }
 
     public function testBuildChatPayloadWithSystemAndUser(): void
@@ -270,14 +289,14 @@ final class AnthropicClientTest extends ClientTestCase
 
         // System prompt should be in separate field, not in messages array
         self::assertSame('Be concise and accurate', $result['system']);
-        
+
         $expectedMessages = [
             ['role' => 'user', 'content' => 'Explain quantum computing'],
             ['role' => 'assistant', 'content' => 'Quantum computing uses quantum mechanics principles.']
         ];
-        
+
         self::assertSame($expectedMessages, $result['messages']);
-        
+
         // Verify system is not in messages array
         foreach ($result['messages'] as $message) {
             self::assertNotEquals('system', $message['role']);
@@ -305,58 +324,162 @@ final class AnthropicClientTest extends ClientTestCase
     public function testGetProviderReturnsAnthropicProvider(): void
     {
         $provider = $this->client->getProvider();
-        
+
         $this->assertInstanceOf(AnthropicProvider::class, $provider);
     }
-    
+
     public function testRequestSuccess(): void
     {
         $payload = 'Test message';
         $options = ['temperature' => 0.5];
-        
+
         $messagesResource = $this->createMock(Messages::class);
         $response = $this->createMock(CreateResponse::class);
         $result = $this->createMock(ResultInterface::class);
-        
+
         $this->apiClient->method('messages')->willReturn($messagesResource);
         $messagesResource->method('create')->willReturn($response);
-        
+
         $resultConverter = $this->createMock(AnthropicResultConverter::class);
         $resultConverter->method('convert')->with($this->model, $response)->willReturn($result);
-        
+
         // Use reflection to inject the result converter
         $reflection = new ReflectionClass($this->client);
         $property = $reflection->getProperty('resultConverter');
         $property->setAccessible(true);
         $property->setValue($this->client, $resultConverter);
-        
+
         $actualResult = $this->client->request($this->model, $payload, $options);
-        
+
         $this->assertSame($result, $actualResult);
     }
-    
+
     public function testRequestFailure(): void
     {
         $payload = 'Test message';
         $options = [];
         $exception = new \Exception('API error');
-        
+
         $messagesResource = $this->createMock(Messages::class);
         $this->apiClient->method('messages')->willReturn($messagesResource);
         $messagesResource->method('create')->willThrowException($exception);
-        
+
         $this->logger->expects($this->once())->method('error')->with(
             'Anthropic request failed',
-            $this->callback(function ($context) {
-                return isset($context['exception']) && 
-                       isset($context['model']) && 
-                       isset($context['payload_type']);
-            })
+            $this->callback(
+                fn ($context) => isset($context['exception']) &&
+                       isset($context['model'], $context['payload_type'])
+            )
         );
-        
+
         $this->expectException(ClientException::class);
         $this->expectExceptionMessage('Anthropic request failed: API error');
-        
+
         $this->client->request($this->model, $payload, $options);
+    }
+
+    public function testRequestSendsAttachmentsAsContentBlocksBeforeText(): void
+    {
+        $captured = null;
+        $messagesResource = $this->createMock(Messages::class);
+        $response = $this->createMock(CreateResponse::class);
+        $result = $this->createMock(ResultInterface::class);
+
+        $this->apiClient->method('messages')->willReturn($messagesResource);
+        $messagesResource->expects($this->once())->method('create')->willReturnCallback(
+            function (array $parameters) use (&$captured, $response): CreateResponse {
+                $captured = $parameters;
+
+                return $response;
+            }
+        );
+        $resultConverter = $this->createMock(AnthropicResultConverter::class);
+        $resultConverter->method('convert')->with($this->model, $response)->willReturn($result);
+        (new ReflectionClass($this->client))->getProperty('resultConverter')->setValue($this->client, $resultConverter);
+
+        $payload = Conversation::withSystem(UserPrompt::create('Extract'), SystemPrompt::create('sys'))
+            ->withAttachments(Attachment::fromBytes('%PDF-1.4 x', 'application/pdf'), Attachment::fromBytes('PNGBYTES', 'image/png'))
+            ->toRequestArray()
+        ;
+
+        $this->assertSame($result, $this->client->request($this->model, $payload));
+
+        $this->assertIsArray($captured);
+        $this->assertSame('sys', $captured['system']);
+        $this->assertSame([
+            ['role' => 'user', 'content' => [
+                ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode('%PDF-1.4 x')]],
+                ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => base64_encode('PNGBYTES')]],
+                ['type' => 'text', 'text' => 'Extract'],
+            ]],
+        ], $captured['messages']);
+    }
+
+    public function testRequestRejectsNonAttachmentBeforeCallingApi(): void
+    {
+        $this->apiClient->expects($this->never())->method('messages');
+
+        $this->expectException(ClientException::class);
+        $this->expectExceptionMessage('Attachments must be a list of Attachment objects.');
+
+        $this->client->request($this->model, [['role' => 'user', 'content' => 'x', 'attachments' => ['not-an-attachment']]]);
+    }
+
+    public function testFailedAttachmentRequestKeepsTheDocumentOutOfLogAndException(): void
+    {
+        $messages = $this->createMock(Messages::class);
+        $this->apiClient->method('messages')->willReturn($messages);
+        $messages->method('create')->willThrowException(new \RuntimeException('Upstream 500'));
+        $this->logger->expects($this->once())->method('error')->with(
+            'Anthropic request with attachments failed',
+            $this->callback(fn (array $context): bool => !isset($context['exception']) && $context['exception_class'] === \RuntimeException::class)
+        );
+
+        try {
+            $this->client->request($this->model, Conversation::fromUser(UserPrompt::create('Extract'))->withAttachments(Attachment::fromBytes('%PDF-1.4 SECRET', 'application/pdf'))->toRequestArray());
+            $this->fail('Expected ClientException');
+        } catch (ClientException $e) {
+            $this->assertNull($e->getPrevious());
+        }
+    }
+
+    public function testFailedTextRequestStillChainsThePreviousException(): void
+    {
+        $messages = $this->createMock(Messages::class);
+        $this->apiClient->method('messages')->willReturn($messages);
+        $messages->method('create')->willThrowException($cause = new \RuntimeException('Upstream 500'));
+
+        try {
+            $this->client->request($this->model, 'Hello');
+            $this->fail('Expected ClientException');
+        } catch (ClientException $e) {
+            $this->assertSame($cause, $e->getPrevious());
+        }
+    }
+
+    public function testAttachmentFailureTraceDoesNotCarryTheDocument(): void
+    {
+        if (ini_get('zend.exception_ignore_args') === '1') {
+            $this->markTestSkipped('Trace arguments are not recorded with zend.exception_ignore_args=On.');
+        }
+
+        $messages = $this->createMock(Messages::class);
+        $this->apiClient->method('messages')->willReturn($messages);
+        $messages->method('create')->willThrowException(new \RuntimeException('Upstream 500'));
+
+        try {
+            $this->client->request($this->model, Conversation::fromUser(UserPrompt::create('Extract'))->withAttachments(Attachment::fromBytes('%PDF-1.4 TRACE-MARKER', 'application/pdf'))->toRequestArray());
+            $this->fail('Expected ClientException');
+        } catch (ClientException $e) {
+            // Only scalar strings reach Sentry frame vars here; SDK objects are rendered as class names
+            $strings = [];
+            $args = array_map(static fn (array $frame): array => $frame['args'] ?? [], $e->getTrace());
+            array_walk_recursive($args, static function (mixed $value) use (&$strings): void {
+                if (is_string($value)) {
+                    $strings[] = $value;
+                }
+            });
+            $this->assertStringNotContainsString(base64_encode('%PDF-1.4 TRACE-MARKER'), implode("\n", $strings));
+        }
     }
 }
