@@ -36,7 +36,8 @@ trait AttachmentBlocksTrait
         }
 
         foreach ($payload as $index => $message) {
-            if (!is_array($message) || empty($message['attachments'])) {
+            // Only a missing key or an empty list means no attachments; anything else is validated below
+            if (!is_array($message) || !array_key_exists('attachments', $message) || $message['attachments'] === []) {
                 continue;
             }
 

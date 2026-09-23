@@ -147,4 +147,22 @@ final class AttachmentBlocksTraitTest extends TestCase
 
         return $subject->run($payload);
     }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function falsyAttachmentValues(): iterable
+    {
+        yield 'empty string' => [''];
+        yield 'zero' => [0];
+        yield 'false' => [false];
+    }
+
+    #[DataProvider('falsyAttachmentValues')]
+    public function testFalsyAttachmentValuesAreRejectedNotSkipped(mixed $value): void
+    {
+        $this->expectException(ClientException::class);
+
+        $this->expand([['role' => 'user', 'content' => 'x', 'attachments' => $value]]);
+    }
 }
