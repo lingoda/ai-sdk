@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+- `RateLimitedDecisionPlatform`: rate limits any `DecisionPlatformInterface`. Each `decide()` takes one request and the estimated input tokens from the limiter, waits when it is exhausted, and retries with exponential backoff (capped at 30 seconds) on 429, 529, 502, 503 and 504. With `SymfonyRateLimiter`, TypeSafe gets 1,080 requests and 13,500,000 tokens per minute, 90% of its published account limits.
+
 ## 2.0.1
 
 ### Fixed
