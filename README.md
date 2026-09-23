@@ -176,6 +176,17 @@ $result->getAnswer('outlook')->choice;          // 'green'
 ```
 Jev is a provider (`AIProvider::TYPESAFE`, models `jev-1.13.0`, `jev-latest`, `jev-preview`, exposed through `$jev->getProvider()`), but a decision provider, not a chat provider: it lives behind `DecisionPlatformInterface` and is never registered on `Platform`, so `ask()` cannot route to it. Unknown model ids throw `ModelNotFoundException` before any request. The data sanitizer does not run on the state.
 
+TypeSafe limits each account to 1,200 requests per minute and 250,000 input tokens per second ([models page](https://docs.typesafe.ai/models)). Wrap the platform to stay under them:
+
+```php
+use Lingoda\AiSdk\RateLimit\RateLimitedDecisionPlatform;
+use Lingoda\AiSdk\RateLimit\SymfonyRateLimiter;
+use Lingoda\AiSdk\RateLimit\TokenEstimatorRegistry;
+
+$jev = new RateLimitedDecisionPlatform($jev, new SymfonyRateLimiter(), TokenEstimatorRegistry::createDefault());
+```
+Each `decide()` takes one request and the estimated state and question tokens from the limiter (defaults: 90% of TypeSafe's limits), waits when the limiter is exhausted, and retries with exponential backoff when TypeSafe answers 429 or 529, or a gateway answers 502, 503 or 504. Other failures are rethrown at once.
+
 ## 🔧 Requirements
 
 - **PHP ^8.4**
