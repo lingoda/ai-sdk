@@ -197,4 +197,16 @@ final class StreamResultTest extends ResultTestCase
         $this->assertSame($stream, $result->getContent());
         $this->assertEquals('', (string) $result->getContent());
     }
+
+    public function testReadsThroughTheUnderlyingStream(): void
+    {
+        $result = new StreamResult(Stream::create('abcdef'));
+
+        $this->assertTrue($result->isReadable());
+        $this->assertFalse($result->eof());
+        $this->assertSame('abc', $result->read(3));
+        $this->assertSame('def', $result->read(10));
+        $this->assertSame('', $result->read(1));
+        $this->assertTrue($result->eof());
+    }
 }

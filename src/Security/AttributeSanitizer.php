@@ -62,37 +62,28 @@ final readonly class AttributeSanitizer
      */
     private function sanitizeObject(object $data): object
     {
-        try {
-            $reflection = new ReflectionObject($data);
-            $sanitized = clone $data;
+        $reflection = new ReflectionObject($data);
+        $sanitized = clone $data;
 
-            foreach ($reflection->getProperties() as $property) {
-                $originalValue = $property->getValue($sanitized);
+        foreach ($reflection->getProperties() as $property) {
+            $originalValue = $property->getValue($sanitized);
 
-                if ($originalValue === null) {
-                    continue;
-                }
-
-                $sanitizedValue = $this->sanitizeProperty($property, $originalValue);
-
-                if ($sanitizedValue !== $originalValue) {
-                    $property->setValue($sanitized, $sanitizedValue);
-
-                    if ($this->auditLog) {
-                        $this->logSanitization($property, $originalValue, $sanitizedValue);
-                    }
-                }
+            if ($originalValue === null) {
+                continue;
             }
 
-            return $sanitized;
-        } catch (\ReflectionException $e) {
-            $this->logger->error('Failed to sanitize object using attributes', [
-                'error' => $e->getMessage(),
-                'object_class' => get_class($data)
-            ]);
+            $sanitizedValue = $this->sanitizeProperty($property, $originalValue);
 
-            return $data;
+            if ($sanitizedValue !== $originalValue) {
+                $property->setValue($sanitized, $sanitizedValue);
+
+                if ($this->auditLog) {
+                    $this->logSanitization($property, $originalValue, $sanitizedValue);
+                }
+            }
         }
+
+        return $sanitized;
     }
 
     /**

@@ -34,7 +34,7 @@ final readonly class DataSanitizer
             PatternRegistry::createDefault(),
             $logger
         );
-        
+
         return new self(
             filter: $filter,
             enabled: true,
@@ -106,7 +106,7 @@ final readonly class DataSanitizer
             Assert::object($sanitizedData, 'AttributeSanitizer must return objects when given objects');
             $data = $sanitizedData;
         }
-        
+
         // Then always apply pattern-based object sanitization
         return $this->sanitizeObject($data);
     }
@@ -115,11 +115,11 @@ final readonly class DataSanitizer
     {
         $originalData = $data;
         $sanitizedData = $this->filter->filter($data);
-        
+
         if ($this->auditLog && $originalData !== $sanitizedData) {
             // Extract detected pattern types by checking which patterns matched
             $detectedPatterns = $this->getDetectedPatterns($originalData);
-            
+
             $this->logger->warning('Sensitive data detected and sanitized', [
                 'detected_patterns' => $detectedPatterns,
                 'original_length' => mb_strlen($originalData),
@@ -127,7 +127,7 @@ final readonly class DataSanitizer
                 'redacted_sample' => mb_substr($sanitizedData, 0, 100) . (mb_strlen($sanitizedData) > 100 ? '...' : '')
             ]);
         }
-        
+
         return $sanitizedData;
     }
 
@@ -140,7 +140,7 @@ final readonly class DataSanitizer
     {
         $detected = [];
         $patterns = $this->filter->getPatternRegistry()->getAllPatterns();
-        
+
         foreach ($patterns as $pattern => $replacement) {
             if (preg_match($pattern, $content)) {
                 // Extract pattern name from the replacement text or create a descriptive name
@@ -152,14 +152,14 @@ final readonly class DataSanitizer
                     $detected[] = 'credit_card';
                 } elseif (str_contains($replacement, 'SSN')) {
                     $detected[] = 'ssn';
-                } elseif (str_contains($replacement, 'API_KEY')) {
+                } elseif (mb_stripos($replacement, 'API_KEY') !== false) {
                     $detected[] = 'api_key';
                 } else {
                     $detected[] = 'sensitive_data';
                 }
             }
         }
-        
+
         return array_values(array_unique($detected));
     }
 
@@ -170,12 +170,12 @@ final readonly class DataSanitizer
     private function sanitizeArray(array $data): array
     {
         $sanitized = [];
-        
+
         foreach ($data as $key => $value) {
             $sanitizedKey = is_string($key) ? $this->sanitizeString($key) : $key;
             $sanitized[$sanitizedKey] = $this->sanitizeRecursive($value);
         }
-        
+
         return $sanitized;
     }
 
@@ -188,24 +188,16 @@ final readonly class DataSanitizer
         try {
             // Convert object to array and sanitize
             $jsonString = json_encode($data, JSON_THROW_ON_ERROR);
-            if ($jsonString === false) {
-                return (object) ['sanitized_object' => '[OBJECT_CONVERSION_FAILED]'];
-            }
-            
             $array = json_decode($jsonString, true, 512, JSON_THROW_ON_ERROR);
-            
+
             if (!is_array($array)) {
                 return (object) ['sanitized_object' => '[OBJECT_CONVERSION_FAILED]'];
             }
-            
+
             $sanitizedArray = $this->sanitizeArray($array);
-            
+
             // Convert back to object
             $sanitizedJsonString = json_encode($sanitizedArray, JSON_THROW_ON_ERROR);
-            if ($sanitizedJsonString === false) {
-                return (object) ['sanitized_object' => '[OBJECT_CONVERSION_FAILED]'];
-            }
-            
             $result = json_decode($sanitizedJsonString, false, 512, JSON_THROW_ON_ERROR);
             if (!is_object($result)) {
                 return (object) ['sanitized_object' => '[OBJECT_CONVERSION_FAILED]'];
@@ -216,7 +208,7 @@ final readonly class DataSanitizer
                 'error' => $e->getMessage(),
                 'object_class' => get_class($data)
             ]);
-            
+
             return (object) ['sanitized_object' => '[OBJECT_SANITIZATION_FAILED]'];
         }
     }

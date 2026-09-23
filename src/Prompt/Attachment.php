@@ -68,8 +68,9 @@ final class Attachment
     /**
      * Attachments are immutable and not cloneable.
      */
-    private function __clone()
+    public function __clone(): void
     {
+        throw new \LogicException('Attachments cannot be cloned.');
     }
 
     /**

@@ -270,7 +270,8 @@ final class AttachmentTest extends TestCase
 
     public function testCannotBeCloned(): void
     {
-        $this->expectException(\Error::class);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Attachments cannot be cloned.');
 
         $attachment = Attachment::fromBytes('%PDF-1.4 x', 'application/pdf');
         $copy = clone $attachment;
