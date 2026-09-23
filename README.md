@@ -123,6 +123,7 @@ $result = $platform->ask($conversation, 'amazon.nova-2-lite-v1:0');
 ```
 - Up to `Attachment::MAX_BYTES` (15 MB). The mime type is detected when omitted; passing it explicitly is more reliable for text formats.
 - Unsupported combinations throw `UnsupportedCapabilityException` before any request.
+- Attachments are sent as provided: the data sanitizer only runs on the prompt text, since pattern redaction corrupts data files (long ids read as phone numbers). Redact attachments yourself if they must not reach the provider.
 
 | Type | OpenAI | Anthropic | Gemini | Bedrock Nova | Bedrock Claude | Needs |
 |---|---|---|---|---|---|---|

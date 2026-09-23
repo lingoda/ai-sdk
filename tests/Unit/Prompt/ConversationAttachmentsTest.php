@@ -204,19 +204,17 @@ final class ConversationAttachmentsTest extends TestCase
         $this->assertNotSame($withAttachment->hash(), $crafted->hash());
     }
 
-    public function testSanitizeRedactsTextAttachments(): void
+    public function testSanitizeLeavesAttachmentsAsProvided(): void
     {
-        $conversation = Conversation::fromUser(UserPrompt::create('Read'))
-            ->withAttachments(Attachment::fromBytes("name,email\nx,jane.doe@example.com\n", 'text/csv'), Attachment::fromBytes('%PDF-1.4 jane.doe@example.com', 'application/pdf'))
+        $csv = "order_id,email\n100200300400,jane.doe@example.com\n";
+        $conversation = Conversation::fromUser(UserPrompt::create('Mail jane.doe@example.com'))
+            ->withAttachments(Attachment::fromBytes($csv, 'text/csv'))
         ;
 
         $sanitized = $conversation->sanitize(DataSanitizer::createDefault());
-        [$csv, $pdf] = $sanitized->getUserPrompt()->getAttachments();
 
-        $this->assertTrue($sanitized->isSanitized());
-        $this->assertStringNotContainsString('jane.doe@example.com', $csv->bytes());
-        $this->assertSame('text/csv', $csv->mimeType);
-        $this->assertSame('%PDF-1.4 jane.doe@example.com', $pdf->bytes(), 'binary documents are not rewritten');
+        $this->assertStringNotContainsString('jane.doe@example.com', $sanitized->getUserContent());
+        $this->assertSame($csv, $sanitized->getUserPrompt()->getAttachments()[0]->bytes());
     }
 
     public function testFromArrayRefusesAttachmentMetadata(): void
