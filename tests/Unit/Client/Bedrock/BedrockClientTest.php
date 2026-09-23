@@ -436,6 +436,116 @@ final class BedrockClientTest extends TestCase
         self::assertSame('document-2', $parts[1]['document']['name'] ?? null);
     }
 
+    /**
+     * @return iterable<string, array{ChatModel}>
+     */
+    public static function allModels(): iterable
+    {
+        foreach (ChatModel::cases() as $model) {
+            yield $model->value => [$model];
+        }
+    }
+
+    #[DataProvider('allModels')]
+    public function testEveryModelRoutesToItsInferenceProfile(ChatModel $chatModel): void
+    {
+        $nova = str_starts_with($chatModel->value, 'amazon.');
+        $this->responses[] = $nova ? $this->novaResponse('ok') : $this->claudeResponse('ok');
+
+        $result = $this->client()->request($this->model($chatModel), 'Hello', ['temperature' => 0]);
+
+        self::assertStringContainsString('/model/eu.' . $chatModel->value . '/invoke', $this->requests[0]['url']);
+        self::assertSame('eu.' . $chatModel->value, $result->getMetadata()['model']);
+
+        $noTemperature = [ChatModel::CLAUDE_OPUS_47, ChatModel::CLAUDE_OPUS_48, ChatModel::CLAUDE_SONNET_5, ChatModel::CLAUDE_OPUS_5, ChatModel::CLAUDE_OPUS_55];
+        $body = $this->requests[0]['body'];
+        $sentTemperature = $nova ? isset($body['inferenceConfig']['temperature']) : array_key_exists('temperature', $body);
+        self::assertSame(!in_array($chatModel, $noTemperature, true), $sentTemperature);
+    }
+
+    #[DataProvider('allModels')]
+    public function testResponseFormatIsSentOnlyWhereSupported(ChatModel $chatModel): void
+    {
+        $supported = [ChatModel::CLAUDE_HAIKU_45, ChatModel::CLAUDE_SONNET_45, ChatModel::CLAUDE_OPUS_45, ChatModel::CLAUDE_SONNET_46, ChatModel::CLAUDE_OPUS_46];
+        $options = ['response_format' => ['type' => 'json_schema', 'json_schema' => ['name' => 'x', 'schema' => ['type' => 'object']]]];
+
+        if (!in_array($chatModel, $supported, true)) {
+            $this->expectException(UnsupportedCapabilityException::class);
+        } else {
+            $this->responses[] = $this->claudeResponse('{}');
+        }
+
+        $this->client()->request($this->model($chatModel), 'Hello', $options);
+
+        self::assertArrayHasKey('output_config', $this->requests[0]['body']);
+    }
+
+    /**
+     * @return iterable<string, array{ChatModel, string, bool}>
+     */
+    public static function documentMatrix(): iterable
+    {
+        foreach (ChatModel::cases() as $model) {
+            $nova = str_starts_with($model->value, 'amazon.');
+            $readsDocuments = $model !== ChatModel::NOVA_MICRO;
+            yield $model->value . ' pdf' => [$model, Attachment::PDF, $readsDocuments];
+            yield $model->value . ' docx' => [$model, Attachment::DOCX, $readsDocuments && $nova];
+        }
+    }
+
+    #[DataProvider('documentMatrix')]
+    public function testDocumentTypesPerModel(ChatModel $chatModel, string $mimeType, bool $accepted): void
+    {
+        $payload = Conversation::fromUser(UserPrompt::create('Read'))->withAttachments(Attachment::fromBytes('%PDF-1.4 x', $mimeType))->toRequestArray();
+
+        if ($accepted) {
+            $this->responses[] = str_starts_with($chatModel->value, 'amazon.') ? $this->novaResponse('ok') : $this->claudeResponse('ok');
+        } else {
+            $this->expectException(UnsupportedCapabilityException::class);
+        }
+
+        $this->client()->request($this->model($chatModel), $payload);
+
+        self::assertCount(1, $this->requests);
+    }
+
+    public function testRefusalIsNotRewrappedAndTextFailuresKeepPrevious(): void
+    {
+        $this->responses[] = $this->claudeBody(['content' => [], 'stop_reason' => 'refusal']);
+        try {
+            $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), 'Hi');
+            self::fail('Expected ClientException');
+        } catch (ClientException $e) {
+            self::assertSame('The model refused the request (stop_reason: refusal).', $e->getMessage());
+        }
+
+        $this->responses[] = new MockResponse('{"message":"bad"}', ['http_code' => 400, 'response_headers' => ['x-amzn-ErrorType' => 'ValidationException']]);
+        try {
+            $this->client()->request($this->model(ChatModel::NOVA_2_LITE), 'Hi');
+            self::fail('Expected ClientException');
+        } catch (ClientException $e) {
+            self::assertNotNull($e->getPrevious());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function nonStandardRegions(): iterable
+    {
+        yield 'us gov cloud' => ['us-gov-west-1'];
+        yield 'eu sovereign cloud' => ['eusc-de-east-1'];
+        yield 'asia pacific' => ['ap-northeast-1'];
+    }
+
+    #[DataProvider('nonStandardRegions')]
+    public function testNonStandardRegionsAreRejected(string $region): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        BedrockClientFactory::createClient($this->runtime($region));
+    }
+
     public function testRegionOutsideEuAndUsIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -632,7 +742,7 @@ final class BedrockClientTest extends TestCase
         return $messages[0]['content'][0];
     }
 
-    public function testFailureExceptionFramesDoNotHoldTheCaughtException(): void
+    public function testAttachmentFailureFramesDoNotHoldTheCaughtException(): void
     {
         if (ini_get('zend.exception_ignore_args') === '1') {
             self::markTestSkipped('Trace arguments are not recorded with zend.exception_ignore_args=On.');
@@ -641,7 +751,7 @@ final class BedrockClientTest extends TestCase
         $this->responses[] = new MockResponse('{"message":"bad"}', ['http_code' => 400, 'response_headers' => ['x-amzn-ErrorType' => 'ValidationException']]);
 
         try {
-            $this->client()->request($this->model(ChatModel::NOVA_2_LITE), 'Hello');
+            $this->client()->request($this->model(ChatModel::NOVA_2_LITE), $this->pdfConversation()->toRequestArray());
             self::fail('Expected ClientException');
         } catch (ClientException $e) {
             self::assertFalse(self::traceHoldsThrowable($e));

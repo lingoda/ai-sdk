@@ -227,6 +227,7 @@ final class AttachmentTest extends TestCase
             Attachment::fromBytes('SECRET-TRACE-MARKER', 'application/zip');
             $this->fail('Expected InvalidArgumentException');
         } catch (\Lingoda\AiSdk\Exception\InvalidArgumentException $e) {
+            $this->assertNotSame([], array_filter(array_column($e->getTrace(), 'args')), 'trace arguments must be recorded for this test to mean anything');
             foreach ($e->getTrace() as $frame) {
                 foreach ($frame['args'] ?? [] as $arg) {
                     $this->assertNotSame('SECRET-TRACE-MARKER', $arg);

@@ -252,6 +252,12 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             $requestPayload['max_tokens'] = min(4096, $model->getMaxTokens());
         }
 
+        // GPT-5 models reject max_tokens and take max_completion_tokens instead
+        if (str_starts_with($model->getId(), 'gpt-5')) {
+            $requestPayload['max_completion_tokens'] ??= $requestPayload['max_tokens'];
+            unset($requestPayload['max_tokens']);
+        }
+
         return $requestPayload;
     }
 }

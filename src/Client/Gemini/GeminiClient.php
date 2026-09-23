@@ -141,8 +141,8 @@ final class GeminiClient implements ClientInterface
                 continue;
             }
 
-            // Images Gemini accepts (no GIF) and PDF; DOCX is not supported
-            $mimeType = $attachment->mimeType === Attachment::DOCX ? null : MimeType::tryFrom($attachment->mimeType);
+            // Images Gemini accepts (no GIF) and PDF; DOCX has no Gemini mime type
+            $mimeType = MimeType::tryFrom($attachment->mimeType);
             if ($mimeType === null) {
                 throw $this->unsupportedAttachment('Gemini', $modelId, $attachment);
             }

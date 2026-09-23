@@ -263,7 +263,7 @@ final readonly class Platform implements PlatformInterface
     /**
      * @param array<string, mixed> $options Additional options for the request
      *
-     * @throws RuntimeException|ClientException|UnsupportedCapabilityException
+     * @throws RuntimeException|ClientException|InvalidArgumentException
      */
     private function invoke(ModelInterface $model, UserPrompt|Conversation $input, array $options = []): ResultInterface
     {

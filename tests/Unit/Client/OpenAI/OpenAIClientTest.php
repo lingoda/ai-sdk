@@ -34,6 +34,7 @@ use OpenAI\Responses\Audio\SpeechStreamResponse;
 use OpenAI\Responses\Audio\TranscriptionResponse;
 use OpenAI\Responses\Audio\TranslationResponse;
 use OpenAI\Responses\Chat\CreateResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
@@ -775,5 +776,44 @@ final class OpenAIClientTest extends ClientTestCase
         });
 
         return $found;
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function tokenLimitParameter(): iterable
+    {
+        yield 'gpt-5' => ['gpt-5', true];
+        yield 'gpt-5-mini dated' => ['gpt-5-mini-2025-08-07', true];
+        yield 'gpt-4.1' => ['gpt-4.1', false];
+        yield 'gpt-4o-mini' => ['gpt-4o-mini', false];
+    }
+
+    #[DataProvider('tokenLimitParameter')]
+    public function testGpt5UsesMaxCompletionTokens(string $modelId, bool $gpt5): void
+    {
+        $captured = null;
+        $chat = $this->createMock(Chat::class);
+        $response = $this->createMock(CreateResponse::class);
+        $this->apiClient->method('chat')->willReturn($chat);
+        $chat->method('create')->willReturnCallback(function (array $parameters) use (&$captured, $response): CreateResponse {
+            $captured = $parameters;
+
+            return $response;
+        });
+        $converter = $this->createMock(OpenAIResultConverter::class);
+        $converter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new \ReflectionProperty($this->client, 'resultConverter'))->setValue($this->client, $converter);
+
+        $this->client->request((new OpenAIProvider())->getModel($modelId), 'Hello', ['max_tokens' => 500]);
+
+        $this->assertIsArray($captured);
+        if ($gpt5) {
+            $this->assertSame(500, $captured['max_completion_tokens'] ?? null);
+            $this->assertArrayNotHasKey('max_tokens', $captured);
+        } else {
+            $this->assertSame(500, $captured['max_tokens'] ?? null);
+            $this->assertArrayNotHasKey('max_completion_tokens', $captured);
+        }
     }
 }

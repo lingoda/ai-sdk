@@ -329,6 +329,13 @@ final class TypeSafeDecisionPlatformTest extends TestCase
         $this->assertSame(400, $logger->records[0]['context']['code'] ?? null);
     }
 
+    public function testUnknownDefaultModelFailsAtConstruction(): void
+    {
+        $this->expectException(ModelNotFoundException::class);
+
+        new TypeSafeDecisionPlatform(new MockHttpClient(), self::API_KEY, 'jev-9.9.9');
+    }
+
     private function platform(
         MockResponse $response,
         ?string $defaultModel = null,

@@ -4,6 +4,7 @@ declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Prompt;
 
+use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Prompt\AssistantPrompt;
 use Lingoda\AiSdk\Prompt\Attachment;
 use Lingoda\AiSdk\Prompt\Conversation;
@@ -201,5 +202,29 @@ final class ConversationAttachmentsTest extends TestCase
         $crafted = Conversation::fromUser(UserPrompt::create('Read|attachments:' . $attachment->mimeType . ':' . $attachment->sha256));
 
         $this->assertNotSame($withAttachment->hash(), $crafted->hash());
+    }
+
+    public function testSanitizeRedactsTextAttachments(): void
+    {
+        $conversation = Conversation::fromUser(UserPrompt::create('Read'))
+            ->withAttachments(Attachment::fromBytes("name,email\nx,jane.doe@example.com\n", 'text/csv'), Attachment::fromBytes('%PDF-1.4 jane.doe@example.com', 'application/pdf'))
+        ;
+
+        $sanitized = $conversation->sanitize(DataSanitizer::createDefault());
+        [$csv, $pdf] = $sanitized->getUserPrompt()->getAttachments();
+
+        $this->assertTrue($sanitized->isSanitized());
+        $this->assertStringNotContainsString('jane.doe@example.com', $csv->bytes());
+        $this->assertSame('text/csv', $csv->mimeType);
+        $this->assertSame('%PDF-1.4 jane.doe@example.com', $pdf->bytes(), 'binary documents are not rewritten');
+    }
+
+    public function testFromArrayRefusesAttachmentMetadata(): void
+    {
+        $array = Conversation::fromUser(UserPrompt::create('Read'))->withAttachments(Attachment::fromBytes('a,b', 'text/csv'))->toArray();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        Conversation::fromArray(['messages' => $array]);
     }
 }

@@ -47,7 +47,7 @@ $transcription = $platform->transcribeAudio('/path/to/audio.mp3', $options);
 - **🛡️ Security First** - Built-in data sanitization and attribute-based protection
 - **🎯 Type Safe** - Strongly-typed results and prompt value objects
 - **🌐 Multi-Provider** - OpenAI, Anthropic, Gemini and AWS Bedrock (optional) with flexible configuration
-- **📎 Attachments** - PDFs and images on the user prompt, validated per model, never written to traces
+- **📎 Attachments** - PDFs, DOCX, text files and images on the user prompt, validated per model, never written to traces
 - **⚖️ Decisions** - Structured yes/no, choice and score answers via TypeSafe Jev
 - **🎭 Capabilities** - Models declare supported features (vision, tools, audio, streaming, reasoning)
 - **⚡ Performance** - Built-in rate limiting and token estimation with exponential backoff
@@ -64,7 +64,7 @@ Results ← Security ← Capabilities ← Response
 ```
 
 - **Platform**: Main entry point for AI operations
-- **Providers**: Manage models for each AI service (OpenAI, Anthropic, Gemini)
+- **Providers**: Manage models for each AI service (OpenAI, Anthropic, Gemini, AWS Bedrock; TypeSafe Jev for decisions)
 - **Models**: Individual AI models with declared capabilities
 - **Clients**: Handle API communication with rate limiting
 - **Results**: Type-safe responses (`TextResult`, `BinaryResult`, `StreamResult`, `ObjectResult`, `ToolCallResult`)

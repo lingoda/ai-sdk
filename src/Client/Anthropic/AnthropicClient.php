@@ -43,7 +43,7 @@ final class AnthropicClient implements ClientInterface
         $modelId = $model->getId();
         $expanded = $this->expandAttachments($payload, fn (Attachment $attachment, int $position): array => match (true) {
             $attachment->isImage() => ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $attachment->mimeType, 'data' => base64_encode($attachment->bytes())]],
-            $attachment->isText() => ['type' => 'document', 'title' => sprintf('document-%d', $position), 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => $attachment->bytes()]],
+            $attachment->isText() => ['type' => 'text', 'text' => $this->attachmentText($attachment, $position)],
             $attachment->mimeType === Attachment::PDF => ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => Attachment::PDF, 'data' => base64_encode($attachment->bytes())]],
             default => throw $this->unsupportedAttachment('Anthropic', $modelId, $attachment),
         });

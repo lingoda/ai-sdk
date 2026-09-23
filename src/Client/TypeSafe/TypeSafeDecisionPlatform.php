@@ -12,6 +12,7 @@ use Lingoda\AiSdk\Enum\AIProvider;
 use Lingoda\AiSdk\Enum\TypeSafe\DecisionModel;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
+use Lingoda\AiSdk\Exception\ModelNotFoundException;
 use Lingoda\AiSdk\Provider\TypeSafeProvider;
 use Lingoda\AiSdk\ProviderInterface;
 use Lingoda\AiSdk\Result\Usage;
@@ -30,6 +31,8 @@ final readonly class TypeSafeDecisionPlatform implements DecisionPlatformInterfa
 
     /**
      * @param string $baseUrl Base URL of a TypeSafe-compatible endpoint (override for WireMock)
+     *
+     * @throws ModelNotFoundException when the default model is not a Jev model
      */
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -40,7 +43,9 @@ final readonly class TypeSafeDecisionPlatform implements DecisionPlatformInterfa
         private LoggerInterface $logger = new NullLogger(),
     ) {
         $this->baseUrl = mb_rtrim($baseUrl, '/');
-        $this->provider = new TypeSafeProvider($defaultModel ?? DecisionModel::JEV_1_13_0->value);
+        $this->provider = new TypeSafeProvider();
+        // Fails here, not on the first decide(), when the default model is unknown
+        $this->provider->setDefaultModel($this->provider->getModel($defaultModel ?? DecisionModel::JEV_1_13_0->value)->getId());
     }
 
     public function getProvider(): ProviderInterface

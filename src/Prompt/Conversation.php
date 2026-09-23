@@ -94,6 +94,10 @@ final readonly class Conversation
                     continue;
                 }
 
+                if (isset($message['attachments'])) {
+                    throw new InvalidArgumentException('Attachments cannot be restored from an array: toArray() keeps only their metadata.');
+                }
+
                 switch ($message['role']) {
                     case 'system':
                         $systemPrompt = SystemPrompt::create($message['content']);
@@ -188,23 +192,34 @@ final readonly class Conversation
     /**
      * Create a sanitized version of this conversation
      * Only sanitizes the user prompt, preserving system and assistant prompts
+     *
+     * @throws InvalidArgumentException when a redacted text attachment exceeds Attachment::MAX_BYTES
      */
     public function sanitize(DataSanitizer $sanitizer): self
     {
         $originalUserContent = $this->userPrompt->getContent();
         $sanitizedUserContent = $sanitizer->sanitize($originalUserContent);
+        $userContent = is_string($sanitizedUserContent) ? $sanitizedUserContent : $originalUserContent;
+
+        // Text attachments reach the model as text, so they get the same treatment as the prompt
+        $changed = $userContent !== $originalUserContent;
+        $attachments = [];
+        foreach ($this->userPrompt->getAttachments() as $attachment) {
+            $sanitizedText = $attachment->isText() ? $sanitizer->sanitize($attachment->bytes()) : null;
+            if (is_string($sanitizedText) && $sanitizedText !== '' && $sanitizedText !== $attachment->bytes()) {
+                $attachment = Attachment::fromBytes($sanitizedText, $attachment->mimeType);
+                $changed = true;
+            }
+            $attachments[] = $attachment;
+        }
 
         // If nothing changed, return the same instance
-        if ($sanitizedUserContent === $originalUserContent) {
+        if (!$changed) {
             return $this;
         }
 
-        // Create new sanitized instance with sanitized user prompt, attachments are not sanitized
         return new self(
-            new UserPrompt(
-                is_string($sanitizedUserContent) ? $sanitizedUserContent : $originalUserContent,
-                attachments: $this->userPrompt->getAttachments(),
-            ),
+            new UserPrompt($userContent, attachments: $attachments),
             $this->systemPrompt,
             $this->assistantPrompt,
             true // Mark as sanitized

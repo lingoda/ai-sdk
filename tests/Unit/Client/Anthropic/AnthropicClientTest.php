@@ -416,7 +416,7 @@ final class AnthropicClientTest extends ClientTestCase
         ], $captured['messages']);
     }
 
-    public function testRequestSendsTextAttachmentAsTextDocument(): void
+    public function testRequestSendsTextAttachmentAsDelimitedTextBlock(): void
     {
         $captured = null;
         $messagesResource = $this->createMock(Messages::class);
@@ -444,7 +444,7 @@ final class AnthropicClientTest extends ClientTestCase
         $this->assertSame([
             ['role' => 'user', 'content' => [
                 ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode('%PDF-1.4 x')]],
-                ['type' => 'document', 'title' => 'document-2', 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => "a,b\n1,2"]],
+                ['type' => 'text', 'text' => "<document-aeedab1ee7a1 name=\"document-2\" type=\"text/csv\">\na,b\n1,2\n</document-aeedab1ee7a1>"],
                 ['type' => 'text', 'text' => 'Sum it'],
             ]],
         ], $captured['messages']);

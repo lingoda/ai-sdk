@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **PHP ^8.3**
+- **PHP ^8.4**, ext-fileinfo
 - PSR-18 HTTP Client
 - PSR-3 Logger (optional)
 

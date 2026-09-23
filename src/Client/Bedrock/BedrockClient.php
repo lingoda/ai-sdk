@@ -8,8 +8,8 @@ use AsyncAws\Core\Exception\Http\HttpException;
 use Lingoda\AiSdk\Client\AttachmentBlocksTrait;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Enum\AIProvider;
-use Lingoda\AiSdk\Enum\Bedrock\ApiFormat;
 use Lingoda\AiSdk\Enum\Bedrock\ChatModel;
+use Lingoda\AiSdk\Enum\Capability;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\UnsupportedCapabilityException;
@@ -48,7 +48,6 @@ final class BedrockClient implements ClientInterface
 {
     use AttachmentBlocksTrait;
 
-    private const array REGION_PREFIXES = ['eu', 'us'];
     private const array OPTIONS = ['temperature', 'max_tokens'];
 
     private readonly string $regionPrefix;
@@ -65,8 +64,9 @@ final class BedrockClient implements ClientInterface
         string $region,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
+        // Standard eu-/us- regions only: us-gov-* and eusc-* use other inference profiles
         $prefix = RegionMapper::map($region);
-        if (!in_array($prefix, self::REGION_PREFIXES, true)) {
+        if (preg_match('/^(eu|us)-(?!gov-)[a-z]+-\d+$/', $region) !== 1) {
             throw new InvalidArgumentException(sprintf(
                 'Bedrock region "%s" is not supported. Use an eu- or us- region.',
                 $region
@@ -90,14 +90,12 @@ final class BedrockClient implements ClientInterface
         }
 
         $this->rejectMeaningfulOptions($chatModel, $options);
+        $hasAttachments = $this->hasAttachments($payload);
         $messages = $this->buildMessageBag($payload, $chatModel);
-        $platform = match ($chatModel->apiFormat()) {
-            ApiFormat::ANTHROPIC_MESSAGES => $this->anthropicMessagesPlatform,
-            ApiFormat::CONVERSE => $this->conversePlatform,
-        };
+        $platform = $this->isConverse($chatModel) ? $this->conversePlatform : $this->anthropicMessagesPlatform;
 
         try {
-            $deferred = $platform->invoke($chatModel->catalogName(), $messages, $this->filterOptions($model, $chatModel, $options));
+            $deferred = $platform->invoke($this->catalogName($chatModel), $messages, $this->filterOptions($model, $chatModel, $options));
             $data = $deferred->getRawResult()->getData();
             $stopReason = $data['stop_reason'] ?? $data['stopReason'] ?? null;
             if ($stopReason === 'refusal') {
@@ -112,10 +110,13 @@ final class BedrockClient implements ClientInterface
             ];
 
             return $this->convertResult($result, $metadata)->withUsage($this->extractUsage($chatModel, $data));
+        } catch (ClientException $e) {
+            throw $e; // refusal or no text: already a clear, payload-free message
         } catch (\Throwable $e) {
             [$context, $reason, $code] = $this->describeFailure($model, $e);
 
-            throw $this->failure($context, $reason, $code);
+            // Requests with attachments keep no previous exception: its frames hold the document
+            throw $this->failure($context, $reason, $code, $hasAttachments ? null : $e);
         }
     }
 
@@ -152,7 +153,7 @@ final class BedrockClient implements ClientInterface
                     }
                     break;
                 case 'assistant':
-                    if (!$hasUser && $chatModel->requiresLeadingUserTurn()) {
+                    if (!$hasUser && $this->isConverse($chatModel)) {
                         throw new UnsupportedCapabilityException(sprintf('Bedrock model "%s" requires the conversation to start with the user message; assistant prompts before it are not supported.', $chatModel->value));
                     }
                     $bag->add(Message::ofAssistant($message['content']));
@@ -196,7 +197,7 @@ final class BedrockClient implements ClientInterface
                 $attachment->isImage() => new Image($attachment->bytes(), $attachment->mimeType),
                 $attachment->isText() => new Text($this->attachmentText($attachment, $index + 1)),
                 // The path only carries the generated name (document-N) to the Nova normalizer
-                $chatModel->acceptsDocument($attachment->mimeType) => new Document($attachment->bytes(), $attachment->mimeType, sprintf('document-%d', $index + 1)),
+                $this->acceptsDocument($chatModel, $attachment->mimeType) => new Document($attachment->bytes(), $attachment->mimeType, sprintf('document-%d', $index + 1)),
                 default => throw $this->unsupportedAttachment('Bedrock', $chatModel->value, $attachment),
             };
         }
@@ -217,7 +218,7 @@ final class BedrockClient implements ClientInterface
             throw new UnsupportedCapabilityException(sprintf('Tools are not supported for Bedrock model "%s" yet.', $chatModel->value));
         }
 
-        if (isset($options['response_format']) && !$chatModel->supportsResponseFormat()) {
+        if (isset($options['response_format']) && !$this->supportsResponseFormat($chatModel)) {
             throw new UnsupportedCapabilityException(sprintf('response_format is not supported for Bedrock model "%s".', $chatModel->value));
         }
     }
@@ -232,8 +233,8 @@ final class BedrockClient implements ClientInterface
     private function filterOptions(ModelInterface $model, ChatModel $chatModel, array $options): array
     {
         $merged = array_merge($model->getOptions(), $options);
-        $allowed = $chatModel->supportsResponseFormat() ? [...self::OPTIONS, 'response_format'] : self::OPTIONS;
-        if (!$chatModel->supportsTemperature()) {
+        $allowed = $this->supportsResponseFormat($chatModel) ? [...self::OPTIONS, 'response_format'] : self::OPTIONS;
+        if (!$this->supportsTemperature($chatModel)) {
             $allowed = array_values(array_diff($allowed, ['temperature']));
         }
 
@@ -293,10 +294,9 @@ final class BedrockClient implements ClientInterface
             }
         }
 
-        return match ($chatModel->apiFormat()) {
-            ApiFormat::ANTHROPIC_MESSAGES => (new AnthropicUsageExtractor())->extract($usage),
-            ApiFormat::CONVERSE => (new NovaUsageExtractor())->extract($usage),
-        };
+        return $this->isConverse($chatModel)
+            ? (new NovaUsageExtractor())->extract($usage)
+            : (new AnthropicUsageExtractor())->extract($usage);
     }
 
     /**
@@ -323,15 +323,15 @@ final class BedrockClient implements ClientInterface
     }
 
     /**
-     * HTTP status (0 when there is none) as the code, no previous exception.
+     * HTTP status (0 when there is none) as the code.
      *
      * @param array<string, mixed> $context
      */
-    private function failure(array $context, string $reason, int $code): ClientException
+    private function failure(array $context, string $reason, int $code, ?\Throwable $previous = null): ClientException
     {
         $this->logger->error('Bedrock request failed', $context);
 
-        return new ClientException(sprintf('Bedrock request failed: %s', mb_substr($reason, 0, 500)), $code);
+        return new ClientException(sprintf('Bedrock request failed: %s', mb_substr($reason, 0, 500)), $code, $previous);
     }
 
     private function httpStatus(HttpException $e): int
@@ -352,5 +352,78 @@ final class BedrockClient implements ClientInterface
         }
 
         return null;
+    }
+
+    /**
+     * Nova speaks the Converse body shape and needs the user turn first; Claude speaks Anthropic Messages.
+     */
+    private function isConverse(ChatModel $chatModel): bool
+    {
+        return match ($chatModel) {
+            ChatModel::NOVA_MICRO, ChatModel::NOVA_LITE, ChatModel::NOVA_PRO, ChatModel::NOVA_2_LITE => true,
+            ChatModel::CLAUDE_HAIKU_45, ChatModel::CLAUDE_SONNET_45, ChatModel::CLAUDE_OPUS_45, ChatModel::CLAUDE_SONNET_46,
+            ChatModel::CLAUDE_OPUS_46, ChatModel::CLAUDE_OPUS_47, ChatModel::CLAUDE_OPUS_48, ChatModel::CLAUDE_SONNET_5,
+            ChatModel::CLAUDE_OPUS_5, ChatModel::CLAUDE_OPUS_55 => false,
+        };
+    }
+
+    /**
+     * Model name in the Symfony AI Bedrock model catalog.
+     *
+     * @return non-empty-string
+     */
+    private function catalogName(ChatModel $chatModel): string
+    {
+        return match ($chatModel) {
+            ChatModel::NOVA_MICRO => 'nova-micro',
+            ChatModel::NOVA_LITE => 'nova-lite',
+            ChatModel::NOVA_PRO => 'nova-pro',
+            ChatModel::NOVA_2_LITE => 'nova-2-lite',
+            ChatModel::CLAUDE_HAIKU_45 => 'claude-haiku-4-5-20251001',
+            ChatModel::CLAUDE_SONNET_45 => 'claude-sonnet-4-5-20250929',
+            ChatModel::CLAUDE_OPUS_45 => 'claude-opus-4-5-20251101',
+            ChatModel::CLAUDE_SONNET_46 => 'claude-sonnet-4-6',
+            ChatModel::CLAUDE_OPUS_46 => 'claude-opus-4-6',
+            ChatModel::CLAUDE_OPUS_47 => 'claude-opus-4-7',
+            ChatModel::CLAUDE_OPUS_48 => 'claude-opus-4-8',
+            ChatModel::CLAUDE_SONNET_5 => 'claude-sonnet-5',
+            ChatModel::CLAUDE_OPUS_5 => 'claude-opus-5',
+            ChatModel::CLAUDE_OPUS_55 => 'claude-opus-5-5',
+        };
+    }
+
+    private function supportsResponseFormat(ChatModel $chatModel): bool
+    {
+        return match ($chatModel) {
+            ChatModel::CLAUDE_HAIKU_45, ChatModel::CLAUDE_SONNET_45, ChatModel::CLAUDE_OPUS_45, ChatModel::CLAUDE_SONNET_46,
+            ChatModel::CLAUDE_OPUS_46 => true,
+            ChatModel::NOVA_MICRO, ChatModel::NOVA_LITE, ChatModel::NOVA_PRO, ChatModel::NOVA_2_LITE,
+            ChatModel::CLAUDE_OPUS_47, ChatModel::CLAUDE_OPUS_48, ChatModel::CLAUDE_SONNET_5, ChatModel::CLAUDE_OPUS_5,
+            ChatModel::CLAUDE_OPUS_55 => false,
+        };
+    }
+
+    private function supportsTemperature(ChatModel $chatModel): bool
+    {
+        return match ($chatModel) {
+            ChatModel::CLAUDE_OPUS_47, ChatModel::CLAUDE_OPUS_48, ChatModel::CLAUDE_SONNET_5, ChatModel::CLAUDE_OPUS_5,
+            ChatModel::CLAUDE_OPUS_55 => false,
+            ChatModel::NOVA_MICRO, ChatModel::NOVA_LITE, ChatModel::NOVA_PRO, ChatModel::NOVA_2_LITE, ChatModel::CLAUDE_HAIKU_45,
+            ChatModel::CLAUDE_SONNET_45, ChatModel::CLAUDE_OPUS_45, ChatModel::CLAUDE_SONNET_46, ChatModel::CLAUDE_OPUS_46 => true,
+        };
+    }
+
+    /**
+     * Document types (PDF, DOCX) the model reads; text and image attachments are handled separately.
+     */
+    private function acceptsDocument(ChatModel $chatModel, string $mimeType): bool
+    {
+        if (!$chatModel->hasCapability(Capability::DOCUMENT)) {
+            return false;
+        }
+
+        return $this->isConverse($chatModel)
+            ? in_array($mimeType, [Attachment::PDF, Attachment::DOCX], true)
+            : $mimeType === Attachment::PDF;
     }
 }
