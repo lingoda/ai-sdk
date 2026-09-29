@@ -66,19 +66,11 @@ final class AttachmentTest extends TestCase
         Attachment::fromBytes('', 'application/pdf');
     }
 
-    public function testAcceptsExactlyMaxBytes(): void
+    public function testLeavesTheSizeLimitToTheProvider(): void
     {
-        $attachment = Attachment::fromBytes(str_repeat('a', Attachment::MAX_BYTES), 'application/pdf');
+        $attachment = Attachment::fromBytes(str_repeat('a', 16 * 1024 * 1024), 'application/pdf');
 
-        $this->assertSame(Attachment::MAX_BYTES, $attachment->size());
-    }
-
-    public function testRejectsMoreThanMaxBytes(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(sprintf('Attachment exceeds the size limit of %d bytes.', Attachment::MAX_BYTES));
-
-        Attachment::fromBytes(str_repeat('a', Attachment::MAX_BYTES + 1), 'application/pdf');
+        $this->assertSame(16 * 1024 * 1024, $attachment->size());
     }
 
     public function testDetectsPdfMimeType(): void

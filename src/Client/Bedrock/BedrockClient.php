@@ -49,6 +49,7 @@ final class BedrockClient implements ClientInterface
     use AttachmentBlocksTrait;
 
     private const array OPTIONS = ['temperature', 'max_tokens'];
+    private const int CLAUDE_MAX_IMAGE_BASE64_BYTES = 5 * 1024 * 1024;
 
     private readonly string $regionPrefix;
     private readonly BedrockProvider $provider;
@@ -193,6 +194,10 @@ final class BedrockClient implements ClientInterface
                 throw new ClientException('Attachments must be a list of Attachment objects.');
             }
 
+            if ($attachment->isImage() && str_starts_with($chatModel->value, 'anthropic.')) {
+                $this->rejectOversizedClaudeImage($chatModel, $attachment);
+            }
+
             $content[] = match (true) {
                 $attachment->isImage() => new Image($attachment->bytes(), $attachment->mimeType),
                 $attachment->isText() => new Text($this->attachmentText($attachment, $index + 1)),
@@ -203,6 +208,26 @@ final class BedrockClient implements ClientInterface
         }
 
         return $content;
+    }
+
+    /**
+     * Bedrock refuses a Claude image whose base64 text is over 5 MiB ("image exceeds 5 MB maximum"), see
+     * https://platform.claude.com/docs/en/build-with-claude/vision#request-limits. The check saves the upload.
+     *
+     * @throws UnsupportedCapabilityException
+     */
+    private function rejectOversizedClaudeImage(ChatModel $chatModel, Attachment $attachment): void
+    {
+        $base64Bytes = 4 * (int) ceil($attachment->size() / 3);
+        if ($base64Bytes > self::CLAUDE_MAX_IMAGE_BASE64_BYTES) {
+            throw new UnsupportedCapabilityException(sprintf(
+                'Bedrock model "%s" takes images of up to %d bytes as base64 (%d bytes as a file); this image is %d bytes as base64.',
+                $chatModel->value,
+                self::CLAUDE_MAX_IMAGE_BASE64_BYTES,
+                intdiv(self::CLAUDE_MAX_IMAGE_BASE64_BYTES, 4) * 3,
+                $base64Bytes,
+            ));
+        }
     }
 
     /**
