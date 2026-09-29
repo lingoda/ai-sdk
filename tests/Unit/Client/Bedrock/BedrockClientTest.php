@@ -146,6 +146,52 @@ final class BedrockClientTest extends TestCase
         );
     }
 
+    public function testClaudeTakesAnImageOfFiveMibAsBase64(): void
+    {
+        $this->responses[] = $this->claudeResponse('ok');
+        $payload = Conversation::fromUser(UserPrompt::create('Describe'))
+            ->withAttachments(Attachment::fromBytes(str_repeat('a', 3_932_160), 'image/jpeg'))
+            ->toRequestArray()
+        ;
+
+        $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), $payload);
+
+        self::assertSame(5 * 1024 * 1024, mb_strlen($this->firstUserPart($this->requests[0])['source']['data'] ?? '', '8bit'));
+    }
+
+    public function testClaudeRejectsALargerImageBeforeAnyHttpRequest(): void
+    {
+        $payload = Conversation::fromUser(UserPrompt::create('Describe'))
+            ->withAttachments(Attachment::fromBytes(str_repeat('a', 3_932_161), 'image/jpeg'))
+            ->toRequestArray()
+        ;
+
+        try {
+            $this->client()->request($this->model(ChatModel::CLAUDE_HAIKU_45), $payload);
+            self::fail('Expected UnsupportedCapabilityException');
+        } catch (UnsupportedCapabilityException $e) {
+            self::assertSame(
+                sprintf('Bedrock model "%s" takes images of up to 5242880 bytes as base64 (3932160 bytes as a file); this image is 5242884 bytes as base64.', ChatModel::CLAUDE_HAIKU_45->value),
+                $e->getMessage()
+            );
+        }
+
+        self::assertSame([], $this->requests);
+    }
+
+    public function testNovaTakesAnImageOverTheClaudeLimit(): void
+    {
+        $this->responses[] = $this->novaResponse('ok');
+        $payload = Conversation::fromUser(UserPrompt::create('Describe'))
+            ->withAttachments(Attachment::fromBytes(str_repeat('a', 3_932_161), 'image/jpeg'))
+            ->toRequestArray()
+        ;
+
+        $this->client()->request($this->model(ChatModel::NOVA_2_LITE), $payload);
+
+        self::assertCount(1, $this->requests);
+    }
+
     public function testTextAttachmentIsSentAsTextOnBothModels(): void
     {
         $this->responses = [$this->claudeResponse('a'), $this->novaResponse('b')];

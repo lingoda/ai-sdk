@@ -121,7 +121,8 @@ $conversation = Conversation::fromUser(UserPrompt::create('Extract the voucher f
 
 $result = $platform->ask($conversation, 'amazon.nova-2-lite-v1:0');
 ```
-- Up to `Attachment::MAX_BYTES` (15 MB). The mime type is detected when omitted; passing it explicitly is more reliable for text formats.
+- The SDK checks a size only where the provider documents a limit and enforces it: Bedrock Claude takes an image of up to 5 MB as base64 (3.75 MB as a file), so a larger one throws `UnsupportedCapabilityException` before the upload. Every other size limit, the request size included, is the provider's, and an oversized request fails with the provider's error.
+- The mime type is detected when omitted; passing it explicitly is more reliable for text formats.
 - Unsupported combinations throw `UnsupportedCapabilityException` before any request.
 - Attachments are sent as provided: the data sanitizer only runs on the prompt text, since pattern redaction corrupts data files (long ids read as phone numbers). Redact attachments yourself if they must not reach the provider.
 

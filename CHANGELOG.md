@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0
+
+### Changed
+- `Attachment` no longer limits the size, and `Attachment::MAX_BYTES` is gone. The 15 MB guard held for no provider: Bedrock Claude refuses an image well below it, and the providers limit the whole request, not each file.
+
+### Added
+- Bedrock Claude: an image over 5 MB as base64 (3.75 MB as a file) throws `UnsupportedCapabilityException` before the upload, which Bedrock would refuse with "image exceeds 5 MB maximum". This resolves the 2.0.0 known limitation for images.
+
+### Not checked
+- The request size. The sources disagree for Claude on Bedrock (Anthropic documents 20 MB, the InvokeModel API 25,000,000 bytes), and in September 2026 Bedrock accepted requests of about 31 MB. An oversized request fails with Bedrock's `ValidationException` ("Input is too long").
+
 ## 2.1.0
 
 ### Added
