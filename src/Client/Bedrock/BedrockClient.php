@@ -194,7 +194,7 @@ final class BedrockClient implements ClientInterface
                 throw new ClientException('Attachments must be a list of Attachment objects.');
             }
 
-            if ($attachment->isImage() && !$this->isConverse($chatModel)) {
+            if ($attachment->isImage() && str_starts_with($chatModel->value, 'anthropic.')) {
                 $this->rejectOversizedClaudeImage($chatModel, $attachment);
             }
 
