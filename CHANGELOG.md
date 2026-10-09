@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.0
+
+### Added
+- OpenAI `gpt-5.4-mini` and `gpt-5.4-nano`, with their `2026-03-17` snapshots: 400K context window, text, tools, vision and documents.
+
+### Changed
+- OpenAI: `temperature` and `top_p` are left out of a request to a model that rejects them. GPT-5 (5.0) models always reason and take only the defaults. GPT-5.x models take them while `reasoning_effort` is `none` (their default), not once a caller asks for reasoning. Before, a GPT-5 request with `temperature: 0` failed with "Unsupported value: 'temperature'".
+
 ## 2.2.0
 
 ### Changed

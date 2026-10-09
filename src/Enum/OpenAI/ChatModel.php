@@ -9,7 +9,13 @@ use Lingoda\AiSdk\ModelConfigurationInterface;
 
 enum ChatModel: string implements ModelConfigurationInterface
 {
-    // GPT-5 Series (Latest - August 2025) - Flagship models
+    // GPT-5.4 mini/nano (March 2026) - reasoning_effort defaults to none, so temperature still applies
+    case GPT_54_MINI = 'gpt-5.4-mini';
+    case GPT_54_MINI_20260317 = 'gpt-5.4-mini-2026-03-17';
+    case GPT_54_NANO = 'gpt-5.4-nano';
+    case GPT_54_NANO_20260317 = 'gpt-5.4-nano-2026-03-17';
+
+    // GPT-5 Series (August 2025) - Flagship models
     case GPT_5 = 'gpt-5';
     case GPT_5_20250807 = 'gpt-5-2025-08-07';
     case GPT_5_MINI = 'gpt-5-mini';
@@ -46,6 +52,12 @@ enum ChatModel: string implements ModelConfigurationInterface
             // GPT-5 series - Assumed very high context (likely 1M+ based on progression)
             self::GPT_5,
             self::GPT_5_20250807 => 2000000, // 2M estimated
+
+            // GPT-5.4 mini/nano: 400K context window (OpenAI model pages)
+            self::GPT_54_MINI,
+            self::GPT_54_MINI_20260317,
+            self::GPT_54_NANO,
+            self::GPT_54_NANO_20260317 => 400000,
 
             // GPT-5 mini/nano series
             self::GPT_5_MINI,
@@ -86,7 +98,11 @@ enum ChatModel: string implements ModelConfigurationInterface
                 Capability::REASONING,
             ],
 
-            // GPT-5 mini/nano - Efficient models with full capabilities
+            // GPT-5 mini/nano and GPT-5.4 mini/nano - Efficient models with full capabilities
+            self::GPT_54_MINI,
+            self::GPT_54_MINI_20260317,
+            self::GPT_54_NANO,
+            self::GPT_54_NANO_20260317,
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807,
             self::GPT_5_NANO,
@@ -153,7 +169,11 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'top_p' => 1.0,
             ],
 
-            // GPT-5 efficient models
+            // GPT-5 and GPT-5.4 efficient models (GPT-5.4 allows 128K output; 16K is the default here)
+            self::GPT_54_MINI,
+            self::GPT_54_MINI_20260317,
+            self::GPT_54_NANO,
+            self::GPT_54_NANO_20260317,
             self::GPT_5_MINI,
             self::GPT_5_MINI_20250807 => [
                 'temperature' => 1.0,
@@ -219,6 +239,10 @@ enum ChatModel: string implements ModelConfigurationInterface
     public function getDisplayName(): string
     {
         return match ($this) {
+            self::GPT_54_MINI => 'GPT-5.4 Mini',
+            self::GPT_54_MINI_20260317 => 'GPT-5.4 Mini (2026-03-17)',
+            self::GPT_54_NANO => 'GPT-5.4 Nano',
+            self::GPT_54_NANO_20260317 => 'GPT-5.4 Nano (2026-03-17)',
             self::GPT_5 => 'GPT-5',
             self::GPT_5_20250807 => 'GPT-5 (2025-08-07)',
             self::GPT_5_MINI => 'GPT-5 Mini',

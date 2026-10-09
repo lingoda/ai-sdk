@@ -787,6 +787,51 @@ final class OpenAIClientTest extends ClientTestCase
         yield 'gpt-5-mini dated' => ['gpt-5-mini-2025-08-07', true];
         yield 'gpt-4.1' => ['gpt-4.1', false];
         yield 'gpt-4o-mini' => ['gpt-4o-mini', false];
+        yield 'gpt-5.4-mini' => ['gpt-5.4-mini', true];
+        yield 'gpt-5.4-nano dated' => ['gpt-5.4-nano-2026-03-17', true];
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>, bool}>
+     */
+    public static function samplingParameters(): iterable
+    {
+        yield 'gpt-4.1-mini keeps temperature' => ['gpt-4.1-mini', [], true];
+        yield 'gpt-5-mini always reasons' => ['gpt-5-mini', [], false];
+        yield 'gpt-5 dated always reasons' => ['gpt-5-2025-08-07', ['reasoning_effort' => 'minimal'], false];
+        yield 'gpt-5.4-mini without reasoning keeps it' => ['gpt-5.4-mini', [], true];
+        yield 'gpt-5.4-nano with reasoning none keeps it' => ['gpt-5.4-nano', ['reasoning_effort' => 'none'], true];
+        yield 'gpt-5.4-mini asked to reason drops it' => ['gpt-5.4-mini', ['reasoning_effort' => 'low'], false];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    #[DataProvider('samplingParameters')]
+    public function testSamplingParametersOnlyReachModelsThatTakeThem(string $modelId, array $options, bool $kept): void
+    {
+        $captured = null;
+        $chat = $this->createMock(Chat::class);
+        $response = $this->createMock(CreateResponse::class);
+        $this->apiClient->method('chat')->willReturn($chat);
+        $chat->method('create')->willReturnCallback(function (array $parameters) use (&$captured, $response): CreateResponse {
+            $captured = $parameters;
+
+            return $response;
+        });
+        $converter = $this->createMock(OpenAIResultConverter::class);
+        $converter->method('convert')->willReturn($this->createMock(ResultInterface::class));
+        (new \ReflectionProperty($this->client, 'resultConverter'))->setValue($this->client, $converter);
+
+        $this->client->request((new OpenAIProvider())->getModel($modelId), 'Hello', ['temperature' => 0, 'top_p' => 0.9] + $options);
+
+        $this->assertIsArray($captured);
+        if ($kept) {
+            $this->assertSame([0, 0.9], [$captured['temperature'] ?? null, $captured['top_p'] ?? null]);
+        } else {
+            $this->assertArrayNotHasKey('temperature', $captured);
+            $this->assertArrayNotHasKey('top_p', $captured);
+        }
     }
 
     #[DataProvider('tokenLimitParameter')]
