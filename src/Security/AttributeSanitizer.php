@@ -228,15 +228,10 @@ final readonly class AttributeSanitizer
      */
     private function logSanitization(ReflectionProperty $property, mixed $originalValue, mixed $sanitizedValue): void
     {
-        $attributes = [];
-
-        foreach ($property->getAttributes(Redact::class) as $attr) {
-            $attributes[] = 'Redact';
-        }
-
-        foreach ($property->getAttributes(Sensitive::class) as $attr) {
-            $attributes[] = 'Sensitive';
-        }
+        $attributes = [
+            ...array_map(static fn (): string => 'Redact', $property->getAttributes(Redact::class)),
+            ...array_map(static fn (): string => 'Sensitive', $property->getAttributes(Sensitive::class)),
+        ];
 
         $this->logger->warning('Property sanitized using attributes', [
             'class' => $property->getDeclaringClass()->getName(),
