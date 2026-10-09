@@ -258,6 +258,21 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             unset($requestPayload['max_tokens']);
         }
 
+        // Sampling parameters only reach a model that takes them: GPT-5 (5.0) always reasons and accepts only the
+        // defaults; GPT-5.x takes them while reasoning_effort is none (its default), not once a caller asks to reason.
+        if (self::rejectsSampling($model->getId(), $requestPayload['reasoning_effort'] ?? null)) {
+            unset($requestPayload['temperature'], $requestPayload['top_p']);
+        }
+
         return $requestPayload;
+    }
+
+    private static function rejectsSampling(string $modelId, mixed $reasoningEffort): bool
+    {
+        if (!str_starts_with($modelId, 'gpt-5')) {
+            return false;
+        }
+
+        return !str_starts_with($modelId, 'gpt-5.') || ($reasoningEffort !== null && $reasoningEffort !== 'none');
     }
 }

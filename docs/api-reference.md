@@ -6,7 +6,13 @@ Complete reference for models, capabilities, and features in the Lingoda AI SDK.
 
 ### OpenAI Models
 
-#### GPT-5 Series (Latest - August 2025)
+#### GPT-5.4 Series (Latest - March 2026)
+- `gpt-5.4-mini` - GPT-5.4 Mini (reasoning effort none by default, so temperature applies)
+- `gpt-5.4-mini-2026-03-17` - Specific GPT-5.4 Mini version
+- `gpt-5.4-nano` - GPT-5.4 Nano
+- `gpt-5.4-nano-2026-03-17` - Specific GPT-5.4 Nano version
+
+#### GPT-5 Series (August 2025)
 - `gpt-5` - Flagship GPT-5 model with advanced reasoning
 - `gpt-5-2025-08-07` - Specific GPT-5 version (August 2025)
 - `gpt-5-mini` - Efficient GPT-5 variant
@@ -17,7 +23,7 @@ Complete reference for models, capabilities, and features in the Lingoda AI SDK.
 **Context Window**: 2M tokens (flagship), 1M tokens (mini/nano)
 **Capabilities**: Text, Tools, Vision, Multimodal, Reasoning
 
-#### GPT-4.1 Series (April 2025) 
+#### GPT-4.1 Series (April 2025)
 - `gpt-4.1` - Latest GPT-4.1 model
 - `gpt-4.1-2025-04-14` - Specific GPT-4.1 version
 - `gpt-4.1-mini` - Efficient GPT-4.1 variant
@@ -31,7 +37,7 @@ Complete reference for models, capabilities, and features in the Lingoda AI SDK.
 #### GPT-4o Series (Current)
 - `gpt-4o` - Latest GPT-4o model
 - `gpt-4o-2024-11-20` - Specific GPT-4o version
-- `gpt-4o-mini` - Cost-effective GPT-4o variant  
+- `gpt-4o-mini` - Cost-effective GPT-4o variant
 - `gpt-4o-mini-2024-07-18` - Specific GPT-4o Mini version
 
 **Context Window**: 128K tokens
@@ -60,10 +66,10 @@ try {
     $provider = new OpenAIProvider();
     $model = $provider->getModel(ChatModel::GPT_4O_MINI->value);
     // or use string directly: $model = $provider->getModel('gpt-4o-mini');
-    
+
     echo "Model: " . $model->getDisplayName() . "\n";
     echo "Max Tokens: " . $model->getMaxTokens() . "\n";
-    
+
     // Convert enum capabilities to strings for display
     $capabilities = array_map(fn($cap) => $cap->value, $model->getCapabilities());
     echo "Capabilities: " . implode(', ', $capabilities) . "\n";
@@ -417,7 +423,7 @@ $hasParams = $template->hasParameters();      // true
 // Data type support
 $prompt = UserPrompt::create('User {{id}}: {{active}}, Score: {{score}}', [
     'id' => 12345,           // number → "12345"
-    'active' => true,        // boolean → "true"  
+    'active' => true,        // boolean → "true"
     'score' => 98.7,         // float → "98.7"
     'metadata' => ['x' => 1] // array → JSON string
 ]);
@@ -555,7 +561,7 @@ $hasParams = $template->hasParameters();   // true
 
 // Partial substitution (missing params preserved)
 $partial = $template->withParameters(['file' => 'document.pdf']);
-echo $partial->getContent(); 
+echo $partial->getContent();
 // "Process document.pdf with {{settings}} configuration"
 
 // Type conversion
@@ -579,7 +585,7 @@ use Lingoda\AiSdk\Prompt\Role;
 
 // Enum values
 Role::USER      // 'user'
-Role::SYSTEM    // 'system' 
+Role::SYSTEM    // 'system'
 Role::ASSISTANT // 'assistant'
 
 // Usage in conditionals
@@ -628,7 +634,7 @@ public function hasProvider(string $name): bool
 
 - `AiSdkException` - Base exception for all SDK errors
 - `ClientException` - Client-related errors (HTTP, API communication)
-- `InvalidArgumentException` - Invalid input parameters  
+- `InvalidArgumentException` - Invalid input parameters
 - `RuntimeException` - Runtime execution errors
 
 ### Specific Exceptions
@@ -664,7 +670,7 @@ try {
 
 ## Next Steps
 
-- [Audio Guide](audio.md) - Complete audio processing documentation  
+- [Audio Guide](audio.md) - Complete audio processing documentation
 - [Examples](examples.md) - Interactive examples with all features
 - [Security](security.md) - Data protection implementation
 - [Advanced Usage](advanced-usage.md) - Complex patterns and optimization
