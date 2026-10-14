@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
@@ -28,9 +28,8 @@ final class SymfonyRateLimiterExternalTest extends TestCase
         // External rate limiter should indicate it has limiters available
         $externalRateLimiter->expects($this->exactly(2))
             ->method('hasRateLimiter')
-            ->willReturnCallback(function (string $providerId, string $type): bool {
-                return $providerId === 'openai' && in_array($type, ['requests', 'tokens'], true);
-            });
+            ->willReturnCallback(fn (string $providerId, string $type): bool => $providerId === 'openai' && in_array($type, ['requests', 'tokens'], true))
+        ;
 
         // External rate limiter should return mock factories
         $externalRateLimiter->expects($this->exactly(2))
@@ -40,7 +39,8 @@ final class SymfonyRateLimiterExternalTest extends TestCase
                     return $mockRequestsFactory;
                 }
                 return $mockTokensFactory;
-            });
+            })
+        ;
 
         $rateLimiter = new SymfonyRateLimiter($logger, null, $externalRateLimiter);
 
@@ -50,22 +50,26 @@ final class SymfonyRateLimiterExternalTest extends TestCase
 
         $mockRequestsFactory->expects($this->once())
             ->method('create')
-            ->willReturn($mockRequestsLimiter);
+            ->willReturn($mockRequestsLimiter)
+        ;
 
         $mockTokensFactory->expects($this->once())
             ->method('create')
-            ->willReturn($mockTokensLimiter);
+            ->willReturn($mockTokensLimiter)
+        ;
 
         $mockRateLimit = $this->createMock(\Symfony\Component\RateLimiter\RateLimit::class);
         $mockRateLimit->method('isAccepted')->willReturn(true);
 
         $mockRequestsLimiter->expects($this->once())
             ->method('consume')
-            ->willReturn($mockRateLimit);
+            ->willReturn($mockRateLimit)
+        ;
 
         $mockTokensLimiter->expects($this->once())
             ->method('consume')
-            ->willReturn($mockRateLimit);
+            ->willReturn($mockRateLimit)
+        ;
 
         // This should not throw an exception
         $rateLimiter->consume($model, 100);

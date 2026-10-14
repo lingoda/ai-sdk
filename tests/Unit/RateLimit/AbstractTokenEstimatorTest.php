@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
@@ -23,7 +23,7 @@ final class AbstractTokenEstimatorTest extends TestCase
     public function testEstimateWithStringPayload(): void
     {
         $result = $this->estimator->estimate($this->model, 'Hello world');
-        
+
         $this->assertGreaterThan(0, $result);
         $this->assertIsInt($result);
     }
@@ -32,7 +32,7 @@ final class AbstractTokenEstimatorTest extends TestCase
     {
         $payload = ['text' => 'Hello world', 'other' => 'data'];
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
         $this->assertIsInt($result);
     }
@@ -40,7 +40,7 @@ final class AbstractTokenEstimatorTest extends TestCase
     public function testEstimateTokensFromTextWithEmptyString(): void
     {
         $result = $this->estimator->publicEstimateTokensFromText('');
-        
+
         $this->assertEquals(1, $result); // Minimum token count
     }
 
@@ -49,19 +49,19 @@ final class AbstractTokenEstimatorTest extends TestCase
         // Test with JSON structure
         $jsonText = '{"key": "value", "array": [1, 2, 3]}';
         $jsonResult = $this->estimator->publicEstimateTokensFromText($jsonText);
-        
+
         $this->assertGreaterThan(0, $jsonResult);
-        
+
         // Test with code block
         $codeText = '```php\necho "Hello World";\n```';
         $codeResult = $this->estimator->publicEstimateTokensFromText($codeText);
-        
+
         $this->assertGreaterThan(0, $codeResult);
-        
+
         // Test with URL
         $urlText = 'Visit https://example.com for more info';
         $urlResult = $this->estimator->publicEstimateTokensFromText($urlText);
-        
+
         $this->assertGreaterThan(0, $urlResult);
     }
 
@@ -69,7 +69,7 @@ final class AbstractTokenEstimatorTest extends TestCase
     {
         $text = 'This is the first sentence. This is the second! And this is the third?';
         $result = $this->estimator->publicEstimateTokensFromText($text);
-        
+
         $this->assertGreaterThan(0, $result);
         // Should be more than a single word due to multiple sentences
         $singleWordResult = $this->estimator->publicEstimateTokensFromText('word');
@@ -81,14 +81,14 @@ final class AbstractTokenEstimatorTest extends TestCase
         // Test that provider-specific adjustments affect the result
         $text = 'This is a standard test sentence for token estimation.';
         $result = $this->estimator->publicEstimateTokensFromText($text);
-        
+
         $this->assertGreaterThan(0, $result);
         $this->assertIsInt($result);
-        
+
         // Test with different adjustments via a different estimator
         $customEstimator = new TestableTokenEstimatorWithCustomAdjustments();
         $customResult = $customEstimator->publicEstimateTokensFromText($text);
-        
+
         // Results should be different due to different provider adjustments
         $this->assertNotEquals($result, $customResult);
     }
@@ -97,10 +97,10 @@ final class AbstractTokenEstimatorTest extends TestCase
     {
         $textWithExtraSpaces = 'This   has    multiple     spaces.';
         $normalText = 'This has multiple spaces.';
-        
+
         $extraSpacesResult = $this->estimator->publicEstimateTokensFromText($textWithExtraSpaces);
         $normalResult = $this->estimator->publicEstimateTokensFromText($normalText);
-        
+
         // Should be similar due to whitespace normalization
         $this->assertGreaterThan(0, $extraSpacesResult);
         $this->assertGreaterThan(0, $normalResult);
@@ -120,7 +120,7 @@ class TestableTokenEstimator extends AbstractTokenEstimator
                 $text .= ' ' . $value;
             }
         }
-        return trim($text);
+        return mb_trim($text);
     }
 
     public function publicEstimateTokensFromText(string $text): int
@@ -142,7 +142,7 @@ class TestableTokenEstimatorWithCustomAdjustments extends AbstractTokenEstimator
                 $text .= ' ' . $value;
             }
         }
-        return trim($text);
+        return mb_trim($text);
     }
 
     protected function getProviderAdjustments(): array

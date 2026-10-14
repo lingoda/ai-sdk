@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
@@ -17,11 +17,11 @@ final class TokenEstimatorTest extends TestCase
     protected function setUp(): void
     {
         $this->estimator = new TokenEstimator();
-        
+
         // Create mock model
         $provider = $this->createMock(ProviderInterface::class);
         $provider->method('getId')->willReturn('openai');
-        
+
         $this->model = $this->createMock(ModelInterface::class);
         $this->model->method('getProvider')->willReturn($provider);
     }
@@ -29,7 +29,7 @@ final class TokenEstimatorTest extends TestCase
     public function testEstimateFromSimpleString(): void
     {
         $result = $this->estimator->estimate($this->model, 'Hello world');
-        
+
         $this->assertGreaterThan(0, $result);
         $this->assertIsInt($result);
     }
@@ -42,9 +42,9 @@ final class TokenEstimatorTest extends TestCase
                 ['role' => 'assistant', 'content' => 'Hi there!'],
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
 
@@ -59,9 +59,9 @@ final class TokenEstimatorTest extends TestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
 
@@ -72,16 +72,16 @@ final class TokenEstimatorTest extends TestCase
                 ['type' => 'text', 'text' => 'Hello world']
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
 
     public function testEmptyPayloadReturnsMinimum(): void
     {
         $result = $this->estimator->estimate($this->model, '');
-        
+
         $this->assertEquals(1, $result);
     }
 
@@ -89,13 +89,13 @@ final class TokenEstimatorTest extends TestCase
     {
         $shortText = 'Hello';
         $longText = 'Hello world, this is a much longer text that should result in a higher token count estimate because it contains more words and characters.';
-        
+
         $shortEstimate = $this->estimator->estimate($this->model, $shortText);
         $longEstimate = $this->estimator->estimate($this->model, $longText);
-        
+
         $this->assertGreaterThan($shortEstimate, $longEstimate);
     }
-    
+
     public function testExtractTextFromCommonFields(): void
     {
         // Test the fallback behavior when no specific estimator pattern matches
@@ -108,16 +108,16 @@ final class TokenEstimatorTest extends TestCase
             'user' => 'User input',
             'assistant' => 'Assistant response'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
-        
+
         // Should be significantly higher than empty payload
         $emptyResult = $this->estimator->estimate($this->model, []);
         $this->assertGreaterThan($emptyResult, $result);
     }
-    
+
     public function testExtractTextFromArrayValues(): void
     {
         $payload = [
@@ -129,30 +129,30 @@ final class TokenEstimatorTest extends TestCase
                 'version' => 1.0
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
-    
+
     public function testExtractTextTrimsWhitespace(): void
     {
         $payload = [
             'content' => '  Leading and trailing spaces  ',
             'text' => '\t\nTabbed and newlined content\t\n'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
-        
+
         // Test that estimation handles whitespace properly
         $trimmedPayload = [
             'content' => 'Leading and trailing spaces',
             'text' => 'Tabbed and newlined content'
         ];
         $trimmedResult = $this->estimator->estimate($this->model, $trimmedPayload);
-        
+
         // Both should be positive, specific values depend on tokenizer implementation
         $this->assertGreaterThan(0, $trimmedResult);
         $this->assertIsInt($trimmedResult);

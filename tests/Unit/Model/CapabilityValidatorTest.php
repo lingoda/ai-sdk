@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Tests\Unit\Model;
 
@@ -18,7 +18,7 @@ final class CapabilityValidatorTest extends TestCase
         $model->method('getId')->willReturn($id);
         $model->method('getCapabilities')->willReturn($capabilities);
         $model->method('hasCapability')->willReturnCallback(
-            static fn(Capability $capability) => in_array($capability, $capabilities, true)
+            static fn (Capability $capability) => in_array($capability, $capabilities, true)
         );
 
         return $model;

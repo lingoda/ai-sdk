@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Model;
 
@@ -30,7 +30,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getId')
-            ->willReturn($expectedId);
+            ->willReturn($expectedId)
+        ;
 
         $this->assertEquals($expectedId, $this->model->getId());
     }
@@ -41,7 +42,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getMaxTokens')
-            ->willReturn($expectedMaxTokens);
+            ->willReturn($expectedMaxTokens)
+        ;
 
         $this->assertEquals($expectedMaxTokens, $this->model->getMaxTokens());
     }
@@ -58,7 +60,8 @@ final class ConfigurableModelTest extends TestCase
             ->expects($this->once())
             ->method('hasCapability')
             ->with($capability)
-            ->willReturn(true);
+            ->willReturn(true)
+        ;
 
         $this->assertTrue($this->model->hasCapability($capability));
     }
@@ -70,7 +73,8 @@ final class ConfigurableModelTest extends TestCase
             ->expects($this->once())
             ->method('hasCapability')
             ->with($capability)
-            ->willReturn(false);
+            ->willReturn(false)
+        ;
 
         $this->assertFalse($this->model->hasCapability($capability));
     }
@@ -81,7 +85,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getCapabilities')
-            ->willReturn($expectedCapabilities);
+            ->willReturn($expectedCapabilities)
+        ;
 
         $this->assertEquals($expectedCapabilities, $this->model->getCapabilities());
     }
@@ -92,7 +97,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getOptions')
-            ->willReturn($expectedOptions);
+            ->willReturn($expectedOptions)
+        ;
 
         $this->assertEquals($expectedOptions, $this->model->getOptions());
     }
@@ -103,7 +109,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getDisplayName')
-            ->willReturn($expectedDisplayName);
+            ->willReturn($expectedDisplayName)
+        ;
 
         $this->assertEquals($expectedDisplayName, $this->model->getDisplayName());
     }
@@ -128,9 +135,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->exactly(count($allCapabilities)))
             ->method('hasCapability')
-            ->willReturnCallback(function (Capability $capability) use ($allCapabilities) {
-                return in_array($capability, $allCapabilities, true);
-            });
+            ->willReturnCallback(fn (Capability $capability) => in_array($capability, $allCapabilities, true))
+        ;
 
         foreach ($allCapabilities as $capability) {
             $this->assertTrue($this->model->hasCapability($capability));
@@ -142,7 +148,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getCapabilities')
-            ->willReturn([]);
+            ->willReturn([])
+        ;
 
         $this->assertEmpty($this->model->getCapabilities());
     }
@@ -152,7 +159,8 @@ final class ConfigurableModelTest extends TestCase
         $this->configuration
             ->expects($this->once())
             ->method('getOptions')
-            ->willReturn([]);
+            ->willReturn([])
+        ;
 
         $this->assertEmpty($this->model->getOptions());
     }
