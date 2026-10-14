@@ -83,12 +83,21 @@ final class ChatModelTest extends TestCase
             $this->assertSame(1.0, $options['temperature'], $model->getId());
         }
 
-        // Astra's lowest effort is `low`, so a pinned none is rejected and sampling never applies.
-        $astra = ChatModel::GPT_6_ASTRA->getOptions();
-        $this->assertArrayNotHasKey('reasoning_effort', $astra);
-        $this->assertArrayNotHasKey('temperature', $astra);
-        $this->assertArrayNotHasKey('top_p', $astra);
-        $this->assertSame(16384, $astra['max_tokens']);
+        foreach ([ChatModel::GPT_56_SOL, ChatModel::GPT_56_TERRA, ChatModel::GPT_56_LUNA] as $model) {
+            $options = $model->getOptions();
+            $this->assertSame('none', $options['reasoning_effort'], $model->getId());
+            $this->assertSame(1.0, $options['temperature'], $model->getId());
+        }
+
+        // Astra and 6.1 Sol have no `none`: their floor is `low`, so a pinned none is rejected and
+        // sampling never applies.
+        foreach ([ChatModel::GPT_6_ASTRA, ChatModel::GPT_61_SOL] as $model) {
+            $options = $model->getOptions();
+            $this->assertArrayNotHasKey('reasoning_effort', $options, $model->getId());
+            $this->assertArrayNotHasKey('temperature', $options, $model->getId());
+            $this->assertArrayNotHasKey('top_p', $options, $model->getId());
+            $this->assertSame(16384, $options['max_tokens'], $model->getId());
+        }
     }
 
     public function testDisplayNames(): void
