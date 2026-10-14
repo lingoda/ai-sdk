@@ -6,7 +6,20 @@ Complete reference for models, capabilities, and features in the Lingoda AI SDK.
 
 ### OpenAI Models
 
-#### GPT-5.4 Series (Latest - March 2026)
+#### GPT-6 Series (Latest - September 2026)
+1,050,000 context window, 128K max output. The SDK sends `reasoning_effort: none` by default: it is
+where OpenAI's GPT-4.x migration guide starts, it is the only setting under which Chat Completions
+supports function calling, and it is what keeps `temperature` and `top_p` usable. Ask for reasoning
+explicitly and the SDK drops those two, because the model then rejects them.
+
+`gpt-6-luna` is OpenAI's named replacement for `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` and
+`gpt-4.1-mini`, all of which leave the API on 14 January 2027.
+
+- `gpt-6-astra` - Most capable, for the hardest end-to-end work
+- `gpt-6-sol` - Mid tier, more reasoning headroom than Luna
+- `gpt-6-luna` - Cheapest, for focused high-volume tasks
+
+#### GPT-5.4 Series (March 2026)
 - `gpt-5.4-mini` - GPT-5.4 Mini (reasoning effort none by default, so temperature applies)
 - `gpt-5.4-mini-2026-03-17` - Specific GPT-5.4 Mini version
 - `gpt-5.4-nano` - GPT-5.4 Nano

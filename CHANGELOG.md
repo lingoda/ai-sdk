@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.0
+
+### Added
+- OpenAI GPT-6: `gpt-6-astra`, `gpt-6-sol` and `gpt-6-luna`. 1,050,000 context window, text, tools, vision, documents and reasoning. `gpt-6-luna` is OpenAI's named replacement for `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` and `gpt-4.1-mini`, which are removed from the API on 14 January 2027.
+- GPT-6 models default to `reasoning_effort: none`. OpenAI's own GPT-4.x migration guide starts there, Chat Completions supports function calling only at that setting, and it is what leaves `temperature` usable. The model's default reasoning effort is `medium`, so a caller that wants reasoning asks for it.
+
+### Changed
+- OpenAI: `max_completion_tokens` now replaces `max_tokens` for GPT-6 as well as GPT-5. Reasoning tokens come out of the output budget, and these models reject `max_tokens` outright.
+- OpenAI: `temperature` and `top_p` are left out for a GPT-6 model unless `reasoning_effort` is `none`. GPT-5.x treats an ABSENT effort as none; GPT-6 does not, because its own default is `medium`.
+
 ## 2.3.0
 
 ### Added

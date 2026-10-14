@@ -252,14 +252,14 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
             $requestPayload['max_tokens'] = min(4096, $model->getMaxTokens());
         }
 
-        // GPT-5 models reject max_tokens and take max_completion_tokens instead
-        if (str_starts_with($model->getId(), 'gpt-5')) {
+        // Reasoning models reject max_tokens and take max_completion_tokens instead.
+        if (self::isReasoningFamily($model->getId())) {
             $requestPayload['max_completion_tokens'] ??= $requestPayload['max_tokens'];
             unset($requestPayload['max_tokens']);
         }
 
         // Sampling parameters only reach a model that takes them: GPT-5 (5.0) always reasons and accepts only the
-        // defaults; GPT-5.x takes them while reasoning_effort is none (its default), not once a caller asks to reason.
+        // defaults; GPT-5.x and GPT-6 take them while reasoning_effort is none, not once a caller asks to reason.
         if (self::rejectsSampling($model->getId(), $requestPayload['reasoning_effort'] ?? null)) {
             unset($requestPayload['temperature'], $requestPayload['top_p']);
         }
@@ -267,10 +267,25 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         return $requestPayload;
     }
 
+    /**
+     * The families whose output budget is max_completion_tokens, because reasoning tokens are
+     * drawn from it. Sending max_tokens to one of these is rejected outright.
+     */
+    private static function isReasoningFamily(string $modelId): bool
+    {
+        return str_starts_with($modelId, 'gpt-5') || str_starts_with($modelId, 'gpt-6');
+    }
+
     private static function rejectsSampling(string $modelId, mixed $reasoningEffort): bool
     {
-        if (!str_starts_with($modelId, 'gpt-5')) {
+        if (!self::isReasoningFamily($modelId)) {
             return false;
+        }
+
+        // GPT-5.0 always reasons, so it never takes them. Every later family takes them only while
+        // reasoning_effort is none; GPT-6 defaults to medium, so an absent value is NOT none there.
+        if (str_starts_with($modelId, 'gpt-6')) {
+            return $reasoningEffort !== 'none';
         }
 
         return !str_starts_with($modelId, 'gpt-5.') || ($reasoningEffort !== null && $reasoningEffort !== 'none');

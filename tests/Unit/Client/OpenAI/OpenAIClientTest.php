@@ -789,6 +789,9 @@ final class OpenAIClientTest extends ClientTestCase
         yield 'gpt-4o-mini' => ['gpt-4o-mini', false];
         yield 'gpt-5.4-mini' => ['gpt-5.4-mini', true];
         yield 'gpt-5.4-nano dated' => ['gpt-5.4-nano-2026-03-17', true];
+        yield 'gpt-6-luna' => ['gpt-6-luna', true];
+        yield 'gpt-6-sol' => ['gpt-6-sol', true];
+        yield 'gpt-6-astra' => ['gpt-6-astra', true];
     }
 
     /**
@@ -802,6 +805,12 @@ final class OpenAIClientTest extends ClientTestCase
         yield 'gpt-5.4-mini without reasoning keeps it' => ['gpt-5.4-mini', [], true];
         yield 'gpt-5.4-nano with reasoning none keeps it' => ['gpt-5.4-nano', ['reasoning_effort' => 'none'], true];
         yield 'gpt-5.4-mini asked to reason drops it' => ['gpt-5.4-mini', ['reasoning_effort' => 'low'], false];
+        // GPT-6 defaults to medium, so an ABSENT reasoning_effort is not none and sampling goes.
+        // The model's own options pin it to none, which is what keeps temperature in practice.
+        yield 'gpt-6-luna without reasoning drops it' => ['gpt-6-luna', ['reasoning_effort' => null], false];
+        yield 'gpt-6-luna with reasoning none keeps it' => ['gpt-6-luna', ['reasoning_effort' => 'none'], true];
+        yield 'gpt-6-sol asked to reason drops it' => ['gpt-6-sol', ['reasoning_effort' => 'high'], false];
+        yield 'gpt-6-astra asked to reason drops it' => ['gpt-6-astra', ['reasoning_effort' => 'max'], false];
     }
 
     /**
