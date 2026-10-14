@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.1
+
+### Fixed
+- OpenAI `gpt-6-astra` no longer pins `reasoning_effort: none`, which it rejects. Its lowest effort is `low`, so it always reasons: the default options now carry neither an effort nor `temperature`/`top_p`. Sol and Luna are unaffected and still pin none. Every astra request made under 2.4.0 failed.
+
 ## 2.4.0
 
 ### Added

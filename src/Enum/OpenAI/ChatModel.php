@@ -9,10 +9,10 @@ use Lingoda\AiSdk\ModelConfigurationInterface;
 
 enum ChatModel: string implements ModelConfigurationInterface
 {
-    // GPT-6 (September 2026). reasoning_effort defaults to MEDIUM on these, unlike GPT-5.4, so the
-    // default options below pin it to none: that is what OpenAI's own GPT-4.x migration guide says
-    // to start from, it is the only setting Chat Completions allows function calling under, and a
-    // caller that wants reasoning passes its own.
+    // GPT-6 (September 2026). reasoning_effort defaults to MEDIUM on these, unlike GPT-5.4, so sol
+    // and luna pin it to none below: that is what OpenAI's own GPT-4.x migration guide says to
+    // start from, it is the only setting Chat Completions allows function calling under, and a
+    // caller that wants reasoning passes its own. Astra has no none to pin.
     case GPT_6_ASTRA = 'gpt-6-astra';
     case GPT_6_SOL = 'gpt-6-sol';
     case GPT_6_LUNA = 'gpt-6-luna';
@@ -194,10 +194,15 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'top_p' => 1.0,
             ],
 
+            // Astra is the one GPT-6 with no `none`: its lowest effort is `low`, so it always
+            // reasons, rejects a pinned none outright, and never takes temperature or top_p.
+            self::GPT_6_ASTRA => [
+                'max_tokens' => 16384,
+            ],
+
             // GPT-6 allows 128K output; 16K is the default here, as for the other families. The
             // reasoning_effort is explicit because the model's own default is medium, which both
             // spends the output budget on reasoning tokens and makes it reject temperature.
-            self::GPT_6_ASTRA,
             self::GPT_6_SOL,
             self::GPT_6_LUNA => [
                 'temperature' => 1.0,

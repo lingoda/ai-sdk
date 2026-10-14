@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Enum\OpenAI;
 
@@ -39,12 +39,12 @@ final class ChatModelTest extends TestCase
         $this->assertContains(Capability::TEXT, $gpt41Capabilities);
         $this->assertContains(Capability::TOOLS, $gpt41Capabilities);
         $this->assertContains(Capability::VISION, $gpt41Capabilities);
-        
+
         $gpt41MiniCapabilities = ChatModel::GPT_41_MINI->getCapabilities();
         $this->assertContains(Capability::TEXT, $gpt41MiniCapabilities);
         $this->assertContains(Capability::TOOLS, $gpt41MiniCapabilities);
         $this->assertContains(Capability::VISION, $gpt41MiniCapabilities);
-        
+
         $gpt41NanoCapabilities = ChatModel::GPT_41_NANO->getCapabilities();
         $this->assertContains(Capability::TEXT, $gpt41NanoCapabilities);
         $this->assertContains(Capability::TOOLS, $gpt41NanoCapabilities);
@@ -69,10 +69,26 @@ final class ChatModelTest extends TestCase
         $this->assertArrayHasKey('temperature', $options);
         $this->assertArrayHasKey('max_tokens', $options);
         $this->assertArrayHasKey('top_p', $options);
-        
+
         $this->assertEquals(1.0, $options['temperature']);
         $this->assertEquals(32768, $options['max_tokens']);
         $this->assertEquals(1.0, $options['top_p']);
+    }
+
+    public function testGpt6ReasoningDefaults(): void
+    {
+        foreach ([ChatModel::GPT_6_SOL, ChatModel::GPT_6_LUNA] as $model) {
+            $options = $model->getOptions();
+            $this->assertSame('none', $options['reasoning_effort'], $model->getId());
+            $this->assertSame(1.0, $options['temperature'], $model->getId());
+        }
+
+        // Astra's lowest effort is `low`, so a pinned none is rejected and sampling never applies.
+        $astra = ChatModel::GPT_6_ASTRA->getOptions();
+        $this->assertArrayNotHasKey('reasoning_effort', $astra);
+        $this->assertArrayNotHasKey('temperature', $astra);
+        $this->assertArrayNotHasKey('top_p', $astra);
+        $this->assertSame(16384, $astra['max_tokens']);
     }
 
     public function testDisplayNames(): void
@@ -87,7 +103,7 @@ final class ChatModelTest extends TestCase
     public function testImplementsModelConfigurationInterface(): void
     {
         $model = ChatModel::GPT_4O;
-        
+
         $this->assertIsString($model->getId());
         $this->assertIsInt($model->getMaxTokens());
         $this->assertIsArray($model->getCapabilities());
@@ -103,14 +119,14 @@ final class ChatModelTest extends TestCase
         $this->assertEquals('gpt-5', $gpt5->getId());
         $this->assertEquals(2000000, $gpt5->getMaxTokens());
         $this->assertTrue($gpt5->hasCapability(Capability::REASONING));
-        
+
         // Test GPT-4.1 nano (different capabilities)
         $gpt41nano = ChatModel::GPT_41_NANO;
         $this->assertEquals('gpt-4.1-nano', $gpt41nano->getId());
         $this->assertEquals(1000000, $gpt41nano->getMaxTokens());
         $this->assertFalse($gpt41nano->hasCapability(Capability::VISION));
         $this->assertTrue($gpt41nano->hasCapability(Capability::TOOLS));
-        
+
         // Test GPT-4 Turbo (legacy model)
         $gpt4turbo = ChatModel::GPT_4_TURBO;
         $this->assertEquals('gpt-4-turbo', $gpt4turbo->getId());
