@@ -9,6 +9,14 @@ use Lingoda\AiSdk\ModelConfigurationInterface;
 
 enum ChatModel: string implements ModelConfigurationInterface
 {
+    // GPT-6 (September 2026). reasoning_effort defaults to MEDIUM on these, unlike GPT-5.4, so the
+    // default options below pin it to none: that is what OpenAI's own GPT-4.x migration guide says
+    // to start from, it is the only setting Chat Completions allows function calling under, and a
+    // caller that wants reasoning passes its own.
+    case GPT_6_ASTRA = 'gpt-6-astra';
+    case GPT_6_SOL = 'gpt-6-sol';
+    case GPT_6_LUNA = 'gpt-6-luna';
+
     // GPT-5.4 mini/nano (March 2026) - reasoning_effort defaults to none, so temperature still applies
     case GPT_54_MINI = 'gpt-5.4-mini';
     case GPT_54_MINI_20260317 = 'gpt-5.4-mini-2026-03-17';
@@ -53,6 +61,11 @@ enum ChatModel: string implements ModelConfigurationInterface
             self::GPT_5,
             self::GPT_5_20250807 => 2000000, // 2M estimated
 
+            // GPT-6: 1,050,000 context window across all three (OpenAI model pages)
+            self::GPT_6_ASTRA,
+            self::GPT_6_SOL,
+            self::GPT_6_LUNA => 1050000,
+
             // GPT-5.4 mini/nano: 400K context window (OpenAI model pages)
             self::GPT_54_MINI,
             self::GPT_54_MINI_20260317,
@@ -90,6 +103,18 @@ enum ChatModel: string implements ModelConfigurationInterface
             // GPT-5 models - Full multimodal capabilities
             self::GPT_5,
             self::GPT_5_20250807 => [
+                Capability::TEXT,
+                Capability::TOOLS,
+                Capability::VISION,
+                Capability::DOCUMENT,
+                Capability::MULTIMODAL,
+                Capability::REASONING,
+            ],
+
+            // GPT-6 - full multimodal, and all three reason on request
+            self::GPT_6_ASTRA,
+            self::GPT_6_SOL,
+            self::GPT_6_LUNA => [
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
@@ -169,6 +194,18 @@ enum ChatModel: string implements ModelConfigurationInterface
                 'top_p' => 1.0,
             ],
 
+            // GPT-6 allows 128K output; 16K is the default here, as for the other families. The
+            // reasoning_effort is explicit because the model's own default is medium, which both
+            // spends the output budget on reasoning tokens and makes it reject temperature.
+            self::GPT_6_ASTRA,
+            self::GPT_6_SOL,
+            self::GPT_6_LUNA => [
+                'temperature' => 1.0,
+                'max_tokens' => 16384,
+                'top_p' => 1.0,
+                'reasoning_effort' => 'none',
+            ],
+
             // GPT-5 and GPT-5.4 efficient models (GPT-5.4 allows 128K output; 16K is the default here)
             self::GPT_54_MINI,
             self::GPT_54_MINI_20260317,
@@ -239,6 +276,9 @@ enum ChatModel: string implements ModelConfigurationInterface
     public function getDisplayName(): string
     {
         return match ($this) {
+            self::GPT_6_ASTRA => 'GPT-6 Astra',
+            self::GPT_6_SOL => 'GPT-6 Sol',
+            self::GPT_6_LUNA => 'GPT-6 Luna',
             self::GPT_54_MINI => 'GPT-5.4 Mini',
             self::GPT_54_MINI_20260317 => 'GPT-5.4 Mini (2026-03-17)',
             self::GPT_54_NANO => 'GPT-5.4 Nano',

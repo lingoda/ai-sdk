@@ -229,7 +229,8 @@ composer require lingoda/ai-sdk
 ## 🤖 Supported Models
 
 **OpenAI Models:**
-- GPT-5.4 series: `gpt-5.4-mini`, `gpt-5.4-nano` (latest)
+- GPT-6 series: `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna` (latest, 1.05M context)
+- GPT-5.4 series: `gpt-5.4-mini`, `gpt-5.4-nano`
 - GPT-5 series: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
 - GPT-4.1 series: `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` (1M context)
 - GPT-4o series: `gpt-4o`, `gpt-4o-mini` (128K context)
