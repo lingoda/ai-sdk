@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.2
+
+### Fixed
+- Token estimation now reads a bare list of role/content messages, which is what `Conversation::toRequestArray()` returns and what every client accepts. No provider extractor recognised that shape: they look for a `messages` key or role keys, found neither, and returned an empty string, so a 24,800 character prompt was charged to the token bucket as **1 token**. Any consumer passing a Conversation had a TPM rate limiter that did nothing. Affects OpenAI, Anthropic and Gemini.
+
 ## 2.4.1
 
 ### Fixed

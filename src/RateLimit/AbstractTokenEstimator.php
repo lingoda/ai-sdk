@@ -23,9 +23,38 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
             return $this->estimateTokensFromText($payload);
         }
 
-        $text = $this->extractTextFromPayload($payload);
+        $text = self::isMessageList($payload)
+            ? self::extractTextFromMessageList($payload)
+            : $this->extractTextFromPayload($payload);
 
         return $this->estimateTokensFromText($text);
+    }
+
+    /**
+     * Conversation::toRequestArray() returns a LIST of role/content messages, which every client
+     * accepts and no provider extractor read: they look for a 'messages' key or role keys and find
+     * neither, so the text came out empty and a whole prompt was charged to the token bucket as 1.
+     *
+     * @param array<string, mixed>|array<int, array{role: string, content: string}> $payload
+     */
+    private static function isMessageList(array $payload): bool
+    {
+        return isset($payload[0]) && is_array($payload[0]) && isset($payload[0]['role']);
+    }
+
+    /**
+     * @param array<string, mixed>|array<int, array{role: string, content: string}> $payload
+     */
+    private static function extractTextFromMessageList(array $payload): string
+    {
+        $text = '';
+        foreach ($payload as $message) {
+            if (is_array($message) && isset($message['content']) && is_string($message['content'])) {
+                $text .= ' ' . $message['content'];
+            }
+        }
+
+        return mb_trim($text);
     }
 
     /**
@@ -61,7 +90,7 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
         // Handle special patterns first and remove them for basic calculation
         $specialTokens = 0;
         $cleanText = $text;
-        
+
         foreach (self::SPECIAL_TOKEN_PATTERNS as $pattern => $tokenCount) {
             $matches = preg_match_all($pattern, $cleanText);
             $specialTokens += ($matches ?: 0) * $tokenCount;
@@ -90,7 +119,7 @@ abstract class AbstractTokenEstimator implements TokenEstimatorInterface
 
         // Weighted average (give more weight to character and word counts)
         $baseEstimate = ($tokensByChar * 0.4 + $tokensByWord * 0.4 + $tokensBySentence * 0.2);
-        
+
         // Add special tokens
         $totalEstimate = $baseEstimate + $specialTokens;
 

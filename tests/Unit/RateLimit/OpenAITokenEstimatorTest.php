@@ -1,13 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
-use Lingoda\AiSdk\ModelInterface;
 use Lingoda\AiSdk\RateLimit\OpenAITokenEstimator;
 use Lingoda\AiSdk\RateLimit\TokenEstimatorInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 
 final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
 {
@@ -15,7 +13,7 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
     {
         return new OpenAITokenEstimator();
     }
-    
+
     protected function getProviderSpecificPayload(): array
     {
         return [
@@ -26,7 +24,7 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
             ]
         ];
     }
-    
+
     protected function getProviderId(): string
     {
         return 'openai';
@@ -41,9 +39,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
                 ['role' => 'system', 'content' => 'You are a helpful assistant'],
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
         // Should be greater than single message due to multiple messages
         $singleResult = $this->estimator->estimate($this->model, ['messages' => [['role' => 'user', 'content' => 'Hello']]]);
@@ -58,9 +56,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
                 ['role' => 'user', 'content' => 'Hello']
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should be greater than without system prompt
         $withoutSystemResult = $this->estimator->estimate($this->model, ['messages' => [['role' => 'user', 'content' => 'Hello']]]);
         $this->assertGreaterThan($withoutSystemResult, $result);
@@ -73,9 +71,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
             'assistant' => 'Machine learning is a subset of artificial intelligence',
             'system' => 'You are an AI expert'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
 
@@ -88,9 +86,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
             ],
             'user' => 'Additional user content'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
     }
 
@@ -103,9 +101,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
                 ['role' => 'system', 'content' => 'Valid content'],
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should still work and only count the valid string content
         $this->assertGreaterThan(0, $result);
     }
@@ -119,9 +117,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
                 ['content' => 'Missing role'], // Missing role
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should return minimum since no valid content, but might be higher due to base estimation
         $this->assertGreaterThanOrEqual(1, $result);
     }
@@ -134,9 +132,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
             'assistant' => ['not', 'string'], // Array
             'system' => 'Valid system prompt'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should only count the valid system prompt
         $this->assertGreaterThan(0, $result);
     }
@@ -149,9 +147,9 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
                 ['role' => 'assistant', 'content' => '   Hi there!   '],
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Trimming should work correctly
         $this->assertGreaterThan(0, $result);
     }
@@ -166,13 +164,13 @@ final class OpenAITokenEstimatorTest extends TokenEstimatorTestCase
             'assistant' => 'Assistant message',
             'user' => 'Additional user content'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should be higher than individual parts
         $systemOnly = $this->estimator->estimate($this->model, ['system' => 'System instruction']);
         $userOnly = $this->estimator->estimate($this->model, ['user' => 'User message']);
-        
+
         $this->assertGreaterThan($systemOnly, $result);
         $this->assertGreaterThan($userOnly, $result);
     }

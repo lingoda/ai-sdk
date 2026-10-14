@@ -1,13 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\RateLimit;
 
-use Lingoda\AiSdk\ModelInterface;
 use Lingoda\AiSdk\RateLimit\GeminiTokenEstimator;
 use Lingoda\AiSdk\RateLimit\TokenEstimatorInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 
 final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
 {
@@ -15,7 +13,7 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
     {
         return new GeminiTokenEstimator();
     }
-    
+
     protected function getProviderSpecificPayload(): array
     {
         return [
@@ -34,7 +32,7 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
             ]
         ];
     }
-    
+
     protected function getProviderId(): string
     {
         return 'gemini';
@@ -57,9 +55,9 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
         // Should be greater than single part due to multiple parts
         $singleResult = $this->estimator->estimate($this->model, [
@@ -83,9 +81,9 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should still work and only count the valid text content
         $this->assertGreaterThan(0, $result);
     }
@@ -103,9 +101,9 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThanOrEqual(1, $result);
     }
 
@@ -115,9 +113,9 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
         $payload = [
             'contents' => []
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertEquals(1, $result);
     }
 
@@ -128,9 +126,9 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ['parts' => []]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertEquals(1, $result);
     }
 
@@ -155,16 +153,16 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         // Should be significantly higher than single block
         $singleBlockResult = $this->estimator->estimate($this->model, [
             'contents' => [
                 ['parts' => [['text' => 'Single content']]]
             ]
         ]);
-        
+
         $this->assertGreaterThan($singleBlockResult, $result);
     }
 
@@ -180,18 +178,18 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
                 ]
             ]
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
-        
+
         // Should be higher than without system instruction
         $withoutSystemResult = $this->estimator->estimate($this->model, [
             'contents' => [
                 ['parts' => [['text' => 'Hello, how can I help?']]]
             ]
         ]);
-        
+
         $this->assertGreaterThan($withoutSystemResult, $result);
     }
 
@@ -202,11 +200,11 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
             'assistant' => 'This is an assistant response',
             'system' => 'This is a system prompt'
         ];
-        
+
         $result = $this->estimator->estimate($this->model, $payload);
-        
+
         $this->assertGreaterThan(0, $result);
-        
+
         // Test individual role fields
         $userResult = $this->estimator->estimate($this->model, ['user' => 'This is a user message']);
         $this->assertGreaterThan(0, $userResult);
@@ -217,13 +215,13 @@ final class GeminiTokenEstimatorTest extends TokenEstimatorTestCase
     {
         // Use a standardized text to test that Gemini adjustments are being applied
         $testText = 'This is a test message with multiple sentences. It contains various words and characters! Does it work correctly?';
-        
+
         $result = $this->estimator->estimate($this->model, $testText);
-        
+
         // Should use Gemini-specific adjustments (more efficient than default)
         $this->assertGreaterThan(0, $result);
         $this->assertIsInt($result);
-        
+
         // Verify it's reasonably sized for the input
         $this->assertGreaterThan(5, $result);  // Should be more than minimal
         $this->assertLessThan(100, $result);   // But not excessive for this text

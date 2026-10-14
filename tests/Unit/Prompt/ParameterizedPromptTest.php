@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace Lingoda\AiSdk\Tests\Unit\Prompt;
 
@@ -16,7 +16,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, {{name}}!');
         $result = $prompt->withParameters(['name' => 'John']);
-        
+
         $this->assertEquals('Hello, John!', $result->getContent());
     }
 
@@ -28,7 +28,7 @@ final class ParameterizedPromptTest extends TestCase
             'name' => 'John',
             'balance' => '$100'
         ]);
-        
+
         $this->assertEquals('Hello, John! Your balance is $100.', $result->getContent());
     }
 
@@ -39,7 +39,7 @@ final class ParameterizedPromptTest extends TestCase
             'name' => 'John',
             'platform' => 'AI SDK'
         ]);
-        
+
         $this->assertEquals('Hello, John! Welcome to AI SDK.', $result->getContent());
     }
 
@@ -47,7 +47,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, {{name}}! Welcome to {{platform}}.');
         $result = $prompt->withParameters(['name' => 'John']);
-        
+
         $this->assertEquals('Hello, John! Welcome to {{platform}}.', $result->getContent());
     }
 
@@ -55,7 +55,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, {{name}}!');
         $result = $prompt->withParameters([]);
-        
+
         $this->assertSame($prompt, $result);
     }
 
@@ -63,7 +63,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, world!');
         $result = $prompt->withParameters(['name' => 'John']);
-        
+
         // Since the prompt has no parameters, it should return the same instance
         $this->assertSame($prompt, $result);
         $this->assertEquals('Hello, world!', $result->getContent());
@@ -73,7 +73,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('As a {{criticlevel}} movie critic, do you like {{movie}}?');
         $parameterNames = $prompt->getParameterNames();
-        
+
         $this->assertEquals(['criticlevel', 'movie'], $parameterNames);
     }
 
@@ -81,7 +81,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello {{name}}, nice to meet you {{name}}!');
         $parameterNames = $prompt->getParameterNames();
-        
+
         $this->assertEquals(['name', 'name'], $parameterNames);
     }
 
@@ -89,21 +89,21 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('This has no parameters.');
         $parameterNames = $prompt->getParameterNames();
-        
+
         $this->assertEquals([], $parameterNames);
     }
 
     public function testHasParametersTrue(): void
     {
         $prompt = UserPrompt::create('Hello, {{name}}!');
-        
+
         $this->assertTrue($prompt->hasParameters());
     }
 
     public function testHasParametersFalse(): void
     {
         $prompt = UserPrompt::create('Hello, world!');
-        
+
         $this->assertFalse($prompt->hasParameters());
     }
 
@@ -114,7 +114,7 @@ final class ParameterizedPromptTest extends TestCase
             'name' => 'John',
             'value' => null
         ]);
-        
+
         $this->assertEquals('Hello, John! Your value is .', $result->getContent());
     }
 
@@ -125,7 +125,7 @@ final class ParameterizedPromptTest extends TestCase
             'score' => 95.5,
             'count' => 10
         ]);
-        
+
         $this->assertEquals('Score: 95.5, Count: 10.', $result->getContent());
     }
 
@@ -136,7 +136,7 @@ final class ParameterizedPromptTest extends TestCase
             'active' => true,
             'enabled' => false
         ]);
-        
+
         $this->assertEquals('Active: true, Enabled: false.', $result->getContent());
     }
 
@@ -146,22 +146,22 @@ final class ParameterizedPromptTest extends TestCase
         $result = $prompt->withParameters([
             'config' => ['key' => 'value', 'enabled' => true]
         ]);
-        
+
         $this->assertEquals('Config: {"key":"value","enabled":true}', $result->getContent());
     }
 
     public function testObjectParameterWithToString(): void
     {
-        $object = new class {
+        $object = new class() {
             public function __toString(): string
             {
                 return 'custom object';
             }
         };
-        
+
         $prompt = UserPrompt::create('Object: {{obj}}');
         $result = $prompt->withParameters(['obj' => $object]);
-        
+
         $this->assertEquals('Object: custom object', $result->getContent());
     }
 
@@ -169,7 +169,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, {{name! Your balance is $100.');
         $result = $prompt->withParameters(['name' => 'John']);
-        
+
         $this->assertEquals('Hello, {{name! Your balance is $100.', $result->getContent());
     }
 
@@ -177,7 +177,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Hello, name}}! Your balance is $100.');
         $result = $prompt->withParameters(['name' => 'John']);
-        
+
         $this->assertEquals('Hello, name}}! Your balance is $100.', $result->getContent());
     }
 
@@ -185,7 +185,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $template = 'Dear {{title}} {{lastName}}, your order #{{orderId}} for {{amount}} items has been {{status}}.';
         $prompt = UserPrompt::create($template);
-        
+
         $result = $prompt->withParameters([
             'title' => 'Mr.',
             'lastName' => 'Smith',
@@ -193,7 +193,7 @@ final class ParameterizedPromptTest extends TestCase
             'amount' => '3',
             'status' => 'shipped'
         ]);
-        
+
         $expected = 'Dear Mr. Smith, your order #12345 for 3 items has been shipped.';
         $this->assertEquals($expected, $result->getContent());
     }
@@ -206,7 +206,7 @@ final class ParameterizedPromptTest extends TestCase
             'second' => '2',
             'third' => '3'
         ]);
-        
+
         $this->assertEquals('123', $result->getContent());
     }
 
@@ -217,7 +217,7 @@ final class ParameterizedPromptTest extends TestCase
             'role' => 'helpful',
             'task' => 'coding'
         ]);
-        
+
         $this->assertEquals('You are a helpful assistant. Help with coding.', $result->getContent());
         $this->assertEquals(Role::SYSTEM, $result->getRole());
     }
@@ -226,10 +226,10 @@ final class ParameterizedPromptTest extends TestCase
     {
         $userPrompt = UserPrompt::create('Hello, {{name}}!');
         $systemPrompt = SystemPrompt::create('You are {{role}}.');
-        
+
         $userResult = $userPrompt->withParameters(['name' => 'John']);
         $systemResult = $systemPrompt->withParameters(['role' => 'assistant']);
-        
+
         $this->assertInstanceOf(UserPrompt::class, $userResult);
         $this->assertInstanceOf(SystemPrompt::class, $systemResult);
         $this->assertEquals(Role::USER, $userResult->getRole());
@@ -242,7 +242,7 @@ final class ParameterizedPromptTest extends TestCase
         $result = $prompt->withParameters([
             'config' => '{"key": "value"}'
         ]);
-        
+
         $this->assertEquals('Config: {"key": "value"}', $result->getContent());
     }
 
@@ -250,7 +250,7 @@ final class ParameterizedPromptTest extends TestCase
     {
         $prompt = UserPrompt::create('Content: {{empty}} end');
         $result = $prompt->withParameters(['empty' => '']);
-        
+
         $this->assertEquals('Content:  end', $result->getContent());
     }
 
@@ -260,21 +260,21 @@ final class ParameterizedPromptTest extends TestCase
             'name' => 'Alice',
             'platform' => 'AI SDK'
         ]);
-        
+
         $this->assertEquals('Hello, Alice! Welcome to AI SDK.', $prompt->getContent());
     }
 
     public function testConstructorWithEmptyParameters(): void
     {
         $prompt = UserPrompt::create('Hello, {{name}}!', []);
-        
+
         $this->assertEquals('Hello, {{name}}!', $prompt->getContent());
     }
 
     public function testConstructorWithoutParameters(): void
     {
         $prompt = UserPrompt::create('Hello, world!');
-        
+
         $this->assertEquals('Hello, world!', $prompt->getContent());
     }
 
@@ -284,7 +284,7 @@ final class ParameterizedPromptTest extends TestCase
             'role' => 'helpful',
             'domain' => 'programming'
         ]);
-        
+
         $this->assertEquals('You are a helpful assistant specializing in programming.', $prompt->getContent());
         $this->assertEquals(Role::SYSTEM, $prompt->getRole());
     }
@@ -294,7 +294,7 @@ final class ParameterizedPromptTest extends TestCase
         $prompt = AssistantPrompt::create('I understand you need help with {{topic}}.', [
             'topic' => 'databases'
         ]);
-        
+
         $this->assertEquals('I understand you need help with databases.', $prompt->getContent());
         $this->assertEquals(Role::ASSISTANT, $prompt->getRole());
     }
@@ -306,7 +306,7 @@ final class ParameterizedPromptTest extends TestCase
             'active' => true,
             'metadata' => ['role' => 'admin']
         ]);
-        
+
         $this->assertEquals('User 12345 is true with data {"role":"admin"}.', $prompt->getContent());
     }
 
@@ -314,10 +314,10 @@ final class ParameterizedPromptTest extends TestCase
     {
         // Test with an object that doesn't have __toString() method
         $plainObject = new \stdClass();
-        
+
         $prompt = UserPrompt::create('Object: {{obj}} end');
         $result = $prompt->withParameters(['obj' => $plainObject]);
-        
+
         // Should fallback to empty string for unsupported types
         $this->assertEquals('Object:  end', $result->getContent());
     }
@@ -326,13 +326,13 @@ final class ParameterizedPromptTest extends TestCase
     {
         // Test with a resource type (if we can create one in a controlled way)
         $stream = fopen('php://memory', 'r');
-        
+
         $prompt = UserPrompt::create('Stream: {{stream}} end');
         $result = $prompt->withParameters(['stream' => $stream]);
-        
+
         // Should fallback to empty string for unsupported types
         $this->assertEquals('Stream:  end', $result->getContent());
-        
+
         fclose($stream);
     }
 }
