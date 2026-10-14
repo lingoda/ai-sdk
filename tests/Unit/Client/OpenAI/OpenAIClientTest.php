@@ -792,6 +792,9 @@ final class OpenAIClientTest extends ClientTestCase
         yield 'gpt-6-luna' => ['gpt-6-luna', true];
         yield 'gpt-6-sol' => ['gpt-6-sol', true];
         yield 'gpt-6-astra' => ['gpt-6-astra', true];
+        yield 'gpt-5.6-terra' => ['gpt-5.6-terra', true];
+        yield 'gpt-5.6-luna' => ['gpt-5.6-luna', true];
+        yield 'gpt-6.1-sol' => ['gpt-6.1-sol', true];
     }
 
     /**
@@ -811,6 +814,11 @@ final class OpenAIClientTest extends ClientTestCase
         yield 'gpt-6-luna with reasoning none keeps it' => ['gpt-6-luna', ['reasoning_effort' => 'none'], true];
         yield 'gpt-6-sol asked to reason drops it' => ['gpt-6-sol', ['reasoning_effort' => 'high'], false];
         yield 'gpt-6-astra asked to reason drops it' => ['gpt-6-astra', ['reasoning_effort' => 'max'], false];
+        // GPT-5.6 defaults to medium like GPT-6, NOT to none like GPT-5.4, so an absent effort drops sampling.
+        yield 'gpt-5.6-terra without reasoning drops it' => ['gpt-5.6-terra', ['reasoning_effort' => null], false];
+        yield 'gpt-5.6-terra with reasoning none keeps it' => ['gpt-5.6-terra', ['reasoning_effort' => 'none'], true];
+        yield 'gpt-5.6-luna asked to reason drops it' => ['gpt-5.6-luna', ['reasoning_effort' => 'high'], false];
+        yield 'gpt-6.1-sol always reasons' => ['gpt-6.1-sol', [], false];
     }
 
     /**

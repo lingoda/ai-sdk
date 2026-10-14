@@ -17,6 +17,16 @@ enum ChatModel: string implements ModelConfigurationInterface
     case GPT_6_SOL = 'gpt-6-sol';
     case GPT_6_LUNA = 'gpt-6-luna';
 
+    // GPT-6.1 Sol: near-Astra quality at Sol's price, and like Astra its floor is `low`, so it
+    // always reasons and takes neither a pinned none nor temperature.
+    case GPT_61_SOL = 'gpt-6.1-sol';
+
+    // GPT-5.6 (2026). Like GPT-6 and unlike GPT-5.4, reasoning_effort defaults to MEDIUM here, so
+    // these pin none in the options below and count as a reasoning default in rejectsSampling().
+    case GPT_56_SOL = 'gpt-5.6-sol';
+    case GPT_56_TERRA = 'gpt-5.6-terra';
+    case GPT_56_LUNA = 'gpt-5.6-luna';
+
     // GPT-5.4 mini/nano (March 2026) - reasoning_effort defaults to none, so temperature still applies
     case GPT_54_MINI = 'gpt-5.4-mini';
     case GPT_54_MINI_20260317 = 'gpt-5.4-mini-2026-03-17';
@@ -63,8 +73,12 @@ enum ChatModel: string implements ModelConfigurationInterface
 
             // GPT-6: 1,050,000 context window across all three (OpenAI model pages)
             self::GPT_6_ASTRA,
+            self::GPT_61_SOL,
             self::GPT_6_SOL,
-            self::GPT_6_LUNA => 1050000,
+            self::GPT_6_LUNA,
+            self::GPT_56_SOL,
+            self::GPT_56_TERRA,
+            self::GPT_56_LUNA => 1050000,
 
             // GPT-5.4 mini/nano: 400K context window (OpenAI model pages)
             self::GPT_54_MINI,
@@ -113,8 +127,12 @@ enum ChatModel: string implements ModelConfigurationInterface
 
             // GPT-6 - full multimodal, and all three reason on request
             self::GPT_6_ASTRA,
+            self::GPT_61_SOL,
             self::GPT_6_SOL,
-            self::GPT_6_LUNA => [
+            self::GPT_6_LUNA,
+            self::GPT_56_SOL,
+            self::GPT_56_TERRA,
+            self::GPT_56_LUNA => [
                 Capability::TEXT,
                 Capability::TOOLS,
                 Capability::VISION,
@@ -196,7 +214,8 @@ enum ChatModel: string implements ModelConfigurationInterface
 
             // Astra is the one GPT-6 with no `none`: its lowest effort is `low`, so it always
             // reasons, rejects a pinned none outright, and never takes temperature or top_p.
-            self::GPT_6_ASTRA => [
+            self::GPT_6_ASTRA,
+            self::GPT_61_SOL => [
                 'max_tokens' => 16384,
             ],
 
@@ -204,7 +223,10 @@ enum ChatModel: string implements ModelConfigurationInterface
             // reasoning_effort is explicit because the model's own default is medium, which both
             // spends the output budget on reasoning tokens and makes it reject temperature.
             self::GPT_6_SOL,
-            self::GPT_6_LUNA => [
+            self::GPT_6_LUNA,
+            self::GPT_56_SOL,
+            self::GPT_56_TERRA,
+            self::GPT_56_LUNA => [
                 'temperature' => 1.0,
                 'max_tokens' => 16384,
                 'top_p' => 1.0,
@@ -284,6 +306,10 @@ enum ChatModel: string implements ModelConfigurationInterface
             self::GPT_6_ASTRA => 'GPT-6 Astra',
             self::GPT_6_SOL => 'GPT-6 Sol',
             self::GPT_6_LUNA => 'GPT-6 Luna',
+            self::GPT_61_SOL => 'GPT-6.1 Sol',
+            self::GPT_56_SOL => 'GPT-5.6 Sol',
+            self::GPT_56_TERRA => 'GPT-5.6 Terra',
+            self::GPT_56_LUNA => 'GPT-5.6 Luna',
             self::GPT_54_MINI => 'GPT-5.4 Mini',
             self::GPT_54_MINI_20260317 => 'GPT-5.4 Mini (2026-03-17)',
             self::GPT_54_NANO => 'GPT-5.4 Nano',

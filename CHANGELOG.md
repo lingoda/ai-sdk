@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.0
+
+### Added
+- OpenAI `gpt-6.1-sol` ($2/$10 per MTok), and the GPT-5.6 family: `gpt-5.6-sol` ($4/$20), `gpt-5.6-terra` ($2/$12) and `gpt-5.6-luna` ($0.20/$1.20). All 1,050,000 context, 128K output, text, tools, vision, documents and reasoning. This completes the set of GPT-6 and GPT-5.6 models the API exposes; `gpt-6.1-sol-ultrafast` appears in rate-limit tables but is not served by `/v1/models` and is not included.
+- `gpt-6.1-sol` has no `none` effort, as with `gpt-6-astra`: its floor is `low`, so it pins no effort and sends neither `temperature` nor `top_p`.
+
+### Fixed
+- OpenAI: GPT-5.6 is now read as reasoning-by-default. `rejectsSampling()` treated every `gpt-5.` model as defaulting to `none`, which holds for GPT-5.4 but not for GPT-5.6, whose own default is `medium`. A GPT-5.6 request with an absent effort would have kept `temperature` and been rejected.
+
 ## 2.4.2
 
 ### Fixed

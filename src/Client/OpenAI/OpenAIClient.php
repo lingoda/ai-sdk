@@ -283,11 +283,20 @@ final class OpenAIClient implements ClientInterface, AudioCapableInterface
         }
 
         // GPT-5.0 always reasons, so it never takes them. Every later family takes them only while
-        // reasoning_effort is none; GPT-6 defaults to medium, so an absent value is NOT none there.
-        if (str_starts_with($modelId, 'gpt-6')) {
+        // reasoning_effort is none.
+        if (self::defaultsToReasoning($modelId)) {
             return $reasoningEffort !== 'none';
         }
 
         return !str_starts_with($modelId, 'gpt-5.') || ($reasoningEffort !== null && $reasoningEffort !== 'none');
+    }
+
+    /**
+     * Families whose OWN default effort is medium, so an absent value is not none. GPT-5.4 and
+     * earlier default to none and are read the other way round.
+     */
+    private static function defaultsToReasoning(string $modelId): bool
+    {
+        return str_starts_with($modelId, 'gpt-6') || str_starts_with($modelId, 'gpt-5.6');
     }
 }
