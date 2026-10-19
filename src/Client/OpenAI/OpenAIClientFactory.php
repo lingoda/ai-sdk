@@ -18,6 +18,7 @@ final readonly class OpenAIClientFactory
         private ?string $organization = null,
         private int $timeout = 30,
         private ?ClientInterface $httpClient = null,
+        private ?string $baseUri = null,
     ) {
     }
 
@@ -27,8 +28,9 @@ final readonly class OpenAIClientFactory
         int $timeout = 30,
         ?ClientInterface $httpClient = null,
         LoggerInterface $logger = new NullLogger(),
+        ?string $baseUri = null,
     ): OpenAIClient {
-        return (new self($apiKey, $organization, $timeout, $httpClient))->create($logger);
+        return (new self($apiKey, $organization, $timeout, $httpClient, $baseUri))->create($logger);
     }
 
     public function create(
@@ -38,12 +40,19 @@ final readonly class OpenAIClientFactory
             'timeout' => $this->timeout,
         ]));
 
-        $client = OpenAI::factory()
+        $factory = OpenAI::factory()
             ->withApiKey($this->apiKey)
             ->withHttpClient($httpClient)
             ->withOrganization($this->organization)
-            ->make()
         ;
+
+        // Host and path, no scheme, e.g. eu.api.openai.com/v1 for EU data residency. Unset keeps
+        // openai-php's api.openai.com/v1.
+        if (null !== $this->baseUri && '' !== $this->baseUri) {
+            $factory = $factory->withBaseUri($this->baseUri);
+        }
+
+        $client = $factory->make();
 
         return new OpenAIClient($client, $logger);
     }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.0
+
+### Added
+- `OpenAIClientFactory` takes `$baseUri`, the host and path with no scheme, so OpenAI traffic can go to a regional endpoint: `eu.api.openai.com/v1` keeps processing in the EEA. Unset keeps openai-php's own `api.openai.com/v1`, and the argument is last on both the constructor and `createClient()`, so no existing caller changes. Note the endpoint is half of it: residency is a property of the PROJECT the key was created in, so an EU endpoint called with a key from a non-EU project is still processed outside the region, and without an error.
+
 ## 2.5.0
 
 ### Added
