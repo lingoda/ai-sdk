@@ -243,8 +243,11 @@ composer require lingoda/ai-sdk
 - Claude 3.5: `claude-3-5-haiku`
 
 **Google Gemini Models:**
+- Gemini 4: `gemini-4-carbon`, `gemini-4-argon`, `gemini-4-hydrogen` (1M context shared by input and output)
+- Gemini 3.8: `gemini-3.8-flash` (1M context)
+- Gemini 3.5: `gemini-3.5-flash-lite` (1M context)
 - Gemini 3.1: `gemini-3.1-flash-lite` (1M context)
-- Gemini 2.5: `gemini-2.5-pro`, `gemini-2.5-flash` (1M context)
+- Gemini 2.5: `gemini-2.5-pro`, `gemini-2.5-flash` (1M context). Deprecated by Google: from 1 December 2026 their requests are served by `gemini-3.8-flash` and `gemini-3.5-flash-lite`
 
 **AWS Bedrock Models** (optional; ids are Bedrock base ids, sent through the region's `eu.`/`us.` inference profile):
 - Amazon Nova: `amazon.nova-2-lite-v1:0` (default), `amazon.nova-pro-v1:0`, `amazon.nova-lite-v1:0`, `amazon.nova-micro-v1:0` (text only)

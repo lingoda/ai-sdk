@@ -18,6 +18,7 @@ use Gemini\Enums\Role;
 use Lingoda\AiSdk\Client\Gemini\GeminiClient;
 use Lingoda\AiSdk\ClientInterface;
 use Lingoda\AiSdk\Enum\AIProvider;
+use Lingoda\AiSdk\Enum\Gemini\ChatModel;
 use Lingoda\AiSdk\Exception\ClientException;
 use Lingoda\AiSdk\Exception\InvalidArgumentException;
 use Lingoda\AiSdk\Exception\ResponseDecodeException;
@@ -360,6 +361,20 @@ final class GeminiClientTest extends ClientTestCase
 
         self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
         self::assertSame(20, $result['generationConfig']->topK);
+    }
+
+    public function testBuildChatPayloadSendsNoSamplingDefaultForAModelThatIgnoresIt(): void
+    {
+        // Gemini 4 Argon presets its output limit only: temperature, topP and topK would be ignored
+        $model = (new GeminiProvider())->getModel(ChatModel::GEMINI_4_ARGON->value);
+
+        $result = $this->invokePrivateMethod('buildChatPayload', [$model, 'Test message', []]);
+
+        self::assertInstanceOf(GenerationConfig::class, $result['generationConfig']);
+        self::assertSame(65536, $result['generationConfig']->maxOutputTokens);
+        self::assertNull($result['generationConfig']->temperature);
+        self::assertNull($result['generationConfig']->topP);
+        self::assertNull($result['generationConfig']->topK);
     }
 
     public function testBuildChatPayloadWithCustomMaxTokensFromModel(): void
