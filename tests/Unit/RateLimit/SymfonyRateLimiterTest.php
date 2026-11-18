@@ -86,7 +86,9 @@ final class SymfonyRateLimiterTest extends TestCase
 
         $this->assertNotNull($retryAfter);
         $this->assertGreaterThan(3500, $retryAfter);
-        $this->assertLessThanOrEqual(3600, $retryAfter);
+        // One second over the hour is possible: Symfony's limiter rounds the instant of the next
+        // free slot UP to a whole second, and the wait is counted from the START of the current one
+        $this->assertLessThanOrEqual(3601, $retryAfter);
     }
 
     /**
