@@ -144,10 +144,26 @@ try {
 
 ### Google Gemini Models
 
+#### Gemini 4 Series
+- `gemini-4-carbon` - Strongest reasoning, slowest and most thinking tokens per answer
+- `gemini-4-argon` - The same reasoning class with faster answers and fewer thinking tokens
+- `gemini-4-hydrogen` - Fast general-purpose model for everyday work
+
+#### Gemini 3.8 and 3.5 Series
+- `gemini-3.8-flash` - Most capable Flash model
+- `gemini-3.5-flash-lite` - Fastest and cheapest, for high-volume tasks
+
+These five models, the Gemini 4 series and the two above, ignore `temperature`, `top_p` and `top_k`,
+so the SDK sends no sampling default for them. Their output limit is 65,536 tokens per response; on
+Gemini 4 the thinking tokens count towards it.
+
 #### Gemini 3.1 Series
 - `gemini-3.1-flash-lite` - Low-latency, cost-effective lightweight tasks
 
 #### Gemini 2.5 Series
+Deprecated by Google. From 1 December 2026 requests to `gemini-2.5-pro` are served by
+`gemini-3.8-flash`, and requests to `gemini-2.5-flash` by `gemini-3.5-flash-lite`.
+
 - `gemini-2.5-pro` - Advanced reasoning and complex tasks
 - `gemini-2.5-flash` - Fast responses and efficient processing
 

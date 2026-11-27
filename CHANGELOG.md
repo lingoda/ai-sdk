@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.7.0
+
+### Added
+- Gemini 4: `gemini-4-carbon`, `gemini-4-argon` and `gemini-4-hydrogen`. One 1,048,576 token window shared by input, thinking and output, with text, tools, vision, documents, multimodal input and reasoning.
+- `gemini-3.8-flash` and `gemini-3.5-flash-lite`: 1,048,576 input tokens, the same capabilities. They are the models Google serves `gemini-2.5-pro` and `gemini-2.5-flash` requests with from 1 December 2026.
+- The five new models default to `maxOutputTokens: 65536`, the documented limit of one response, and carry no `temperature`, `topP` or `topK` default. Gemini 3.5 and later ignore the three sampling parameters, and Google has announced that a later generation will reject them. A caller who passes one still has it sent.
+
+### Deprecated upstream
+- `gemini-2.5-pro` and `gemini-2.5-flash` stay in the enum and keep working. Google routes them to `gemini-3.8-flash` and `gemini-3.5-flash-lite` from 1 December 2026, at the prices of those models. `gemini-2.5-flash` is still the provider's default model.
+
+### Not included
+- The thinking level. The new models run at Google's default: `medium` for Carbon, Argon and 3.8 Flash, `high` for Hydrogen, `minimal` for 3.5 Flash-Lite.
+- Responses longer than 65,536 tokens ("long decode") on Gemini 4.
+
 ## 2.6.0
 
 ### Added
